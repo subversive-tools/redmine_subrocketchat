@@ -175,6 +175,23 @@ module RedmineSubrocketchat
         response&.dig('user', '_id')
       end
 
+      # Public: Ensures a specific Rocket.Chat user ID (`rc_user_id`) is invited to the project's Rocket.Chat group
+      def ensure_rc_user_id_in_project_channel(rc_user_id, project)
+        return false if rc_user_id.blank? || project.nil?
+
+        room_id = get_or_create_project_room_id(project)
+        return false if room_id.blank?
+
+        execute_request(
+          'groups.invite',
+          params: { 'roomId' => room_id, 'userId' => rc_user_id }
+        )
+        true
+      rescue StandardError => e
+        log("Could not invite rc_user_id '#{rc_user_id}' to project '#{project.identifier}': #{e.message}", level: :warn)
+        false
+      end
+
       # Public: Generates a resume authentication token for a Redmine user in Rocket.Chat
       # Also ensures the user is a member of the project's Rocket.Chat group if a project is passed.
       def create_user_login_token(user, project: nil)
@@ -185,7 +202,7 @@ module RedmineSubrocketchat
         if project
           channel_name = channel_name_for(project)
           room_id = get_or_create_project_room_id(project)
-          if room_id && project.users.include?(user)
+          if room_id && (project.users.include?(user) || user.admin?) && rc_user_id.present?
             current_members = fetch_channel_members(room_id)
             manage_channel_user(:add, user.login, channel_name, room_id: room_id) unless current_members.include?(user.login)
           end
@@ -344,9 +361,10 @@ module RedmineSubrocketchat
 
         current_members = fetch_channel_members(room_id)
         project_users = project.members.map(&:user).compact.reject(&:anonymous?)
+        admin_logins = User.active.where(admin: true).pluck(:login)
         project_logins = project_users.map(&:login)
 
-        (current_members - project_logins - ['redmine_bot']).each do |member_login|
+        (current_members - project_logins - admin_logins - ['redmine_bot']).each do |member_login|
           log("Removing user '#{member_login}' from channel '#{channel_name}'", context: project.identifier)
           remove_member_from_channel(member_login, channel_name, room_id: room_id)
         end

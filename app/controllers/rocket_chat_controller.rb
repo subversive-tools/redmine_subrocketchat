@@ -296,6 +296,14 @@ class RocketChatController < ApplicationController
       return proxy_room_files_v8(rc_base, images_only: rc_path == 'api/v1/channels.images')
     end
 
+    if request.method_symbol == :post && rc_path == 'api/v1/login'
+      return proxy_login_and_ensure_room_member(rc_base)
+    end
+
+    if request.method_symbol == :get && rc_path == 'api/v1/rooms.info' && params[:roomId].present?
+      return proxy_rooms_info_with_auto_invite(rc_base)
+    end
+
     query_str = request.query_string.presence
 
     target_url = "#{rc_base}/#{rc_path}"
@@ -331,13 +339,78 @@ class RocketChatController < ApplicationController
       http.request(req)
     end
 
-    render plain: response.body, status: response.code.to_i, content_type: (response['content-type'] || 'application/json')
+    resp_content_type = response['content-type'] || 'application/json'
+    resp_body = response.body.to_s
+    if resp_body.strip.empty? && resp_content_type.include?('json')
+      resp_body = '{"status":"success","success":true}'
+    end
+
+    render plain: resp_body, status: response.code.to_i, content_type: resp_content_type
   rescue StandardError => e
     Rails.logger.error("Rocket.Chat Proxy Error (#{params[:rc_path]}): #{e.message}")
     render json: { status: 'error', error: e.message }, status: :bad_gateway
   end
 
   private
+
+  # Intercepts `POST /api/v1/login` from EmbeddedChat. When the user successfully authenticates
+  # (and has Redmine's `:access_chat` permission to reach this proxy), automatically ensures that
+  # the authenticated Rocket.Chat user (`data.userId`) is invited to the current project's private
+  # Rocket.Chat group (`rm_<project_identifier>`). This guarantees that:
+  # - Redmine admins (who may not be explicit project members) or users whose Redmine login differs
+  #   from their Rocket.Chat username never get kicked out with "Not Allowed" on `rooms.info`!
+  def proxy_login_and_ensure_room_member(rc_base)
+    uri = URI("#{rc_base}/api/v1/login")
+    req = Net::HTTP::Post.new(uri)
+    req['Content-Type'] = request.content_type.presence || 'application/json'
+    req['Accept'] = 'application/json'
+    req.body = request.raw_post
+
+    res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
+      http.request(req)
+    end
+
+    if res.is_a?(Net::HTTPSuccess)
+      data = JSON.parse(res.body) rescue {}
+      rc_uid = data.dig('data', 'userId')
+      if rc_uid.present? && @project
+        RedmineSubrocketchat::RocketChatHelper.ensure_rc_user_id_in_project_channel(rc_uid, @project)
+      end
+    end
+
+    resp_body = res.body.to_s
+    resp_body = '{"status":"success","success":true}' if resp_body.strip.empty?
+    render plain: resp_body, status: res.code.to_i, content_type: (res['content-type'] || 'application/json')
+  end
+
+  # When a user switches to another Redmine project while already logged into EmbeddedChat (via cached token),
+  # `GET /api/v1/rooms.info?roomId=...` is called first. If the user is authorized in Redmine (`:access_chat`)
+  # but not yet in this project's private Rocket.Chat group (`400 Not Allowed`), automatically invite their
+  # `X-User-Id` into the room and retry `rooms.info` so they never get logged out!
+  def proxy_rooms_info_with_auto_invite(rc_base)
+    room_id = params[:roomId].to_s
+    auth_token = request.headers['X-Auth-Token'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_token']
+    rc_user_id = request.headers['X-User-Id'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_user_id']
+
+    uri = URI("#{rc_base}/api/v1/rooms.info?roomId=#{URI.encode_www_form_component(room_id)}")
+    req = Net::HTTP::Get.new(uri)
+    req['X-Auth-Token'] = auth_token if auth_token.present?
+    req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    req['Accept'] = 'application/json'
+
+    res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
+      http.request(req)
+    end
+
+    if !res.is_a?(Net::HTTPSuccess) && rc_user_id.present? && @project
+      RedmineSubrocketchat::RocketChatHelper.ensure_rc_user_id_in_project_channel(rc_user_id, @project)
+      res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
+        http.request(req)
+      end
+    end
+
+    render plain: res.body, status: res.code.to_i, content_type: (res['content-type'] || 'application/json')
+  end
 
   # Translates `GET /api/v1/channels.images?roomId=...` and `GET /api/v1/groups.files?roomId=...`
   # so ImageGallery and FileGallery work in private groups and their URLs use our authenticated Redmine proxy.
