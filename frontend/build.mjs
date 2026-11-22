@@ -37,11 +37,16 @@ if (!ecCode.includes('Cg as useMessageStore')) {
   );
 }
 
-// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") completely when not authenticated (`!oe`)
-if (!ecCode.includes('return!oe?null:d(Z,{className:"ec-chat-input "')) {
+// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") visually when not authenticated (`!oe`)
+// (Must keep the DOM node mounted with display:none so ChatInput's useEffect ref `A.current` is never null!)
+if (!ecCode.includes('style:le({},l,!oe&&{display:"none"})')) {
+  ecCode = ecCode.replace(
+    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}',
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
+  );
   ecCode = ecCode.replace(
     'return d(Z,{className:"ec-chat-input ".concat(I),style:l}',
-    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}'
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
   );
 }
 
