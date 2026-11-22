@@ -51,10 +51,15 @@ if (!ecCode.includes('style:le({},l,!oe&&{display:"none"})')) {
 }
 
 // 6. Automatically show the Login modal directly whenever the user is not authenticated and not in the TOTP step
-if (!ecCode.includes('!sg(function(e){return e.isUserAuthenticated})')) {
+// (Call all Zustand hook selectors unconditionally at top level of tb() so React hook order never changes!)
+if (!ecCode.includes('__rcIsAuth=sg(function(e){return e.isUserAuthenticated})')) {
+  ecCode = ecCode.replace(
+    'X=mg((function(e){return e.isLoginModalOpen}))||(!sg(function(e){return e.isUserAuthenticated})&&!mg(function(e){return e.isLoginIn})&&!dg(function(e){return e.isTotpModalOpen}))',
+    '__rcModalOpen=mg((function(e){return e.isLoginModalOpen})),__rcIsAuth=sg(function(e){return e.isUserAuthenticated}),__rcIsLoginIn=mg(function(e){return e.isLoginIn}),__rcIsTotp=dg(function(e){return e.isTotpModalOpen}),X=__rcModalOpen||(!__rcIsAuth&&!__rcIsLoginIn&&!__rcIsTotp)'
+  );
   ecCode = ecCode.replace(
     'X=mg((function(e){return e.isLoginModalOpen}))',
-    'X=mg((function(e){return e.isLoginModalOpen}))||(!sg(function(e){return e.isUserAuthenticated})&&!mg(function(e){return e.isLoginIn})&&!dg(function(e){return e.isTotpModalOpen}))'
+    '__rcModalOpen=mg((function(e){return e.isLoginModalOpen})),__rcIsAuth=sg(function(e){return e.isUserAuthenticated}),__rcIsLoginIn=mg(function(e){return e.isLoginIn}),__rcIsTotp=dg(function(e){return e.isTotpModalOpen}),X=__rcModalOpen||(!__rcIsAuth&&!__rcIsLoginIn&&!__rcIsTotp)'
   );
 }
 
