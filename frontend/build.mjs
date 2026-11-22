@@ -59,17 +59,15 @@ if (!ecCode.includes('onKeyDown:function(e){"Enter"===e.key&&')) {
   );
 }
 
-// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") visually when not authenticated (`!oe`)
-if (!ecCode.includes('style:le({},l,!oe&&{display:"none"})')) {
-  ecCode = ecCode.replace(
-    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}',
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
-  );
-  ecCode = ecCode.replace(
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:l}',
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
-  );
-}
+// 5. Revert any inline style patch on ChatInput (`le` is a `useState` setter inside ChatInput, NOT `_objectSpread2`!)
+ecCode = ecCode.replace(
+  'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}',
+  'return d(Z,{className:"ec-chat-input ".concat(I),style:l}'
+);
+ecCode = ecCode.replace(
+  'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}',
+  'return d(Z,{className:"ec-chat-input ".concat(I),style:l}'
+);
 
 // 6. Ensure LoginForm uses standard single Zustand selector (opened automatically via RedmineEmbeddedChatApp useEffect)
 ecCode = ecCode.replace(

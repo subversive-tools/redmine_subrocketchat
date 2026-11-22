@@ -345,6 +345,10 @@ body .ec-modal-footer button.ec-button {
 }
 
 /* Chat Input Box at Bottom */
+.rc-EmbeddedMount .ec-chat-input:has(textarea[placeholder="Sign in to chat"]) {
+  display: none !important;
+}
+
 .rc-EmbeddedMount .ec-chat-input {
   flex-shrink: 0 !important;
   margin-top: auto !important;
