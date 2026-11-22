@@ -48,6 +48,14 @@ if (!ecCode.includes('window.__rcFormatThreadTitle')) {
   );
 }
 
+// 4. Support Enter key to submit inside TOTP modal input
+if (!ecCode.includes('onKeyDown:function(e){"Enter"===e.key&&')) {
+  ecCode = ecCode.replace(
+    'd(V,{type:"password",onChange:function(e){n(e.target.value)},placeholder:"123456"})',
+    'd(V,{type:"password",onChange:function(e){n(e.target.value)},onKeyDown:function(e){"Enter"===e.key&&(e.preventDefault(),null!==i&&null!==f&&c(f,i,l),n(void 0))},placeholder:"123456"})'
+  );
+}
+
 fs.writeFileSync(ecIndexPath, ecCode, 'utf8');
 console.log('✔ Patched @embeddedchat/react/dist/esm/index.js');
 
