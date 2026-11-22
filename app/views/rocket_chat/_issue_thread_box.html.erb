@@ -1,0 +1,21 @@
+<!-- app/views/rocket_chat/_issue_thread_box.html.erb -->
+<%
+  has_thread = issue.respond_to?(:rocketchat_thread_id) && issue.rocketchat_thread_id.present?
+  tooltip_text = if has_thread
+                   "#{l(:'rocketchat.thread.status_active', default: 'Aktiver Ticket-Thread vorhanden')} — #{l(:'rocketchat.thread.open_btn', default: 'Ticket-Thread im Chat öffnen')}"
+                 else
+                   "#{l(:'rocketchat.thread.status_none', default: 'Noch kein eigener Thread für dieses Ticket')} — #{l(:'rocketchat.thread.start_btn', default: 'Ticket-Thread im Chat starten')}"
+                 end
+%>
+<a href="#"
+   id="rc-issue-thread-template"
+   class="icon icon-comment rc-ContextualThreadLink rc-OpenIssueThreadBtn <%= 'is-active' if has_thread %>"
+   style="display: none;"
+   data-issue-id="<%= issue.id %>"
+   data-project-id="<%= project.identifier %>"
+   data-thread-id="<%= has_thread ? issue.rocketchat_thread_id : '' %>"
+   data-active-tooltip="<%= "#{l(:'rocketchat.thread.status_active', default: 'Aktiver Ticket-Thread vorhanden')} — #{l(:'rocketchat.thread.open_btn', default: 'Ticket-Thread im Chat öffnen')}" %>"
+   title="<%= tooltip_text %>">
+  <span class="rc-ContextualThreadLink-label"><%= l(:'rocketchat.init.menu_caption', default: 'Chat') %></span>
+  <span class="rc-ContextualThreadLink-dot"></span>
+</a>

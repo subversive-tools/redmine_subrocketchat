@@ -1,0 +1,152 @@
+<!-- app/views/settings/_rocket_chat_settings.html.erb -->
+<h3><%= l(:'rocketchat.settings.title') %></h3>
+
+<%= l(:'rocketchat.settings.description') %>
+<br><br>
+<h4><%= l(:'rocketchat.settings.settings') %></h4>
+
+<p>
+  <%= label_tag 'settings[rocket_chat_url]', l(:'rocketchat.settings.rocket_chat_url') %>
+  <%= text_field_tag 'settings[rocket_chat_url]', Setting.plugin_redmine_subrocketchat['rocket_chat_url'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.rocket_chat_url_hint') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[rocket_chat_url_internal]', l(:'rocketchat.settings.rocket_chat_url_internal') %>
+  <%= text_field_tag 'settings[rocket_chat_url_internal]', Setting.plugin_redmine_subrocketchat['rocket_chat_url_internal'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.rocket_chat_url_internal_hint') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[rocket_chat_user_id]', l(:'rocketchat.settings.rocket_chat_user_id') %>
+  <%= text_field_tag 'settings[rocket_chat_user_id]', Setting.plugin_redmine_subrocketchat['rocket_chat_user_id'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.rocket_chat_user_id_hint') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[rocket_chat_token]', l(:'rocketchat.settings.rocket_chat_token') %>
+  <%= password_field_tag 'settings[rocket_chat_token]', Setting.plugin_redmine_subrocketchat['rocket_chat_token'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.rocket_chat_token_hint') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[redmine_host_url]', l(:'rocketchat.settings.redmine_host_url') %>
+  <%= text_field_tag 'settings[redmine_host_url]', Setting.plugin_redmine_subrocketchat['redmine_host_url'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.redmine_host_url_hint') %></small>
+</p>
+
+<hr>
+<h4><%= l(:'rocketchat.settings.features_title', default: 'EmbeddedChat, SSO & Ticket-Threads') %></h4>
+
+<p>
+  <%= label_tag 'settings[show_sidebar]', l(:'rocketchat.settings.show_sidebar') %>
+  <%= hidden_field_tag 'settings[show_sidebar]', 'false' %>
+  <%= check_box_tag 'settings[show_sidebar]', 'true', Setting.plugin_redmine_subrocketchat['show_sidebar'] == 'true' %>
+  <br>
+  <small><%= l(:'rocketchat.settings.show_sidebar_hint') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[auto_login_users]', l(:'rocketchat.settings.auto_login_users', default: 'Automatischer Login (SSO via Token) in EmbeddedChat') %>
+  <%= hidden_field_tag 'settings[auto_login_users]', 'false' %>
+  <%= check_box_tag 'settings[auto_login_users]', 'true', Setting.plugin_redmine_subrocketchat['auto_login_users'] != 'false' %>
+  <br>
+  <small><%= l(:'rocketchat.settings.auto_login_users_hint', default: 'Erstellt beim Öffnen automatisch ein Rocket.Chat Resume-Token für den aktuellen Redmine-Benutzer.') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[rocket_chat_token_secret]', l(:'rocketchat.settings.rocket_chat_token_secret', default: 'Rocket.Chat CREATE_TOKENS_FOR_USERS_SECRET (Optional für SSO)') %>
+  <%= password_field_tag 'settings[rocket_chat_token_secret]', Setting.plugin_redmine_subrocketchat['rocket_chat_token_secret'], size: 60 %>
+  <br>
+  <small><%= l(:'rocketchat.settings.rocket_chat_token_secret_hint', default: 'Ab Rocket.Chat 7/8 wird für /api/v1/users.createToken die Env-Variable CREATE_TOKENS_FOR_USERS_SECRET auf dem Rocket.Chat-Server benötigt. Falls leer, loggt sich jeder Benutzer einmalig direkt im EmbeddedChat ein (Session bleibt im Browser gespeichert).') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[auto_create_users]', l(:'rocketchat.settings.auto_create_users', default: 'Fehlende Benutzer automatisch in Rocket.Chat anlegen') %>
+  <%= hidden_field_tag 'settings[auto_create_users]', 'false' %>
+  <%= check_box_tag 'settings[auto_create_users]', 'true', Setting.plugin_redmine_subrocketchat['auto_create_users'] != 'false' %>
+  <br>
+  <small><%= l(:'rocketchat.settings.auto_create_users_hint', default: 'Legt Redmine-Benutzer bei Bedarf automatisch in Rocket.Chat an (mit Benutzername, Name und E-Mail).') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[auto_create_issue_threads]', l(:'rocketchat.settings.auto_create_issue_threads', default: 'Ticket-Threads automatisch bei neuen Tickets starten') %>
+  <%= hidden_field_tag 'settings[auto_create_issue_threads]', 'false' %>
+  <%= check_box_tag 'settings[auto_create_issue_threads]', 'true', Setting.plugin_redmine_subrocketchat['auto_create_issue_threads'] == 'true' %>
+  <br>
+  <small><%= l(:'rocketchat.settings.auto_create_issue_threads_hint', default: 'Erstellt für jedes neue Ticket automatisch eine Start-Nachricht als Thread im Projekt-Kanal.') %></small>
+</p>
+
+<p>
+  <%= label_tag 'settings[post_issue_updates_to_thread]', l(:'rocketchat.settings.post_issue_updates_to_thread', default: 'Ticket-Updates & Kommentare in den Ticket-Thread posten') %>
+  <%= hidden_field_tag 'settings[post_issue_updates_to_thread]', 'false' %>
+  <%= check_box_tag 'settings[post_issue_updates_to_thread]', 'true', Setting.plugin_redmine_subrocketchat['post_issue_updates_to_thread'] != 'false' %>
+  <br>
+  <small><%= l(:'rocketchat.settings.post_issue_updates_to_thread_hint', default: 'Wenn ein Ticket einen aktiven Thread hat, werden Statusänderungen und Notizen automatisch als Antwort in diesen Thread gepostet.') %></small>
+</p>
+
+<hr>
+<h4><%= l(:'rocketchat.settings.instructions') %></h4>
+<b><%= l(:'rocketchat.settings.prepare_server') %></b>
+<ol>
+  <li>
+    <%= l(:'rocketchat.settings.api_account') %>
+    <ul>
+      <li>
+        <%= l(:'rocketchat.settings.create_bot') %>
+        <table style="font-size: smaller; line-height: 1.2em; border: solid 1pt #0000002b; background: white; margin: 1em; padding: 1em;">
+          <thead>
+            <tr>
+              <th><%= l(:'rocketchat.settings.permission_key') %></th>
+              <th><%= l(:'rocketchat.settings.permission_value') %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>api-bypass-rate-limit</td>
+              <td><%= l(:'rocketchat.settings.api_bypass_hint') %></td>
+            </tr>
+            <tr>
+              <td>create-p / delete-p</td>
+              <td><%= l(:'rocketchat.settings.create_p_hint') %></td>
+            </tr>
+            <tr>
+              <td>add-user-to-any-p-room / remove-user</td>
+              <td><%= l(:'rocketchat.settings.add_user_hint') %></td>
+            </tr>
+            <tr>
+              <td>create-user / create-user-token</td>
+              <td><%= l(:'rocketchat.settings.create_user_token_hint', default: 'Für automatisches Anlegen von Benutzern und SSO Auto-Login in EmbeddedChat.') %></td>
+            </tr>
+            <tr>
+              <td>create-personal-access-tokens</td>
+              <td><%= l(:'rocketchat.settings.create_tokens_hint') %></td>
+            </tr>
+            <tr>
+              <td>send-many-messages</td>
+              <td><%= l(:'rocketchat.settings.send_messages_hint') %></td>
+            </tr>
+          </tbody>
+        </table>
+      </li>
+      <li><%= l(:'rocketchat.settings.token_creation') %></li>
+    </ul>
+  </li>
+  <li>
+    <%= l(:'rocketchat.settings.allow_cors', default: 'CORS für EmbeddedChat in Rocket.Chat aktivieren:') %>
+    <ul>
+      <li><%= l(:'rocketchat.settings.enable_cors_hint', default: 'Unter Administration -> Workspace -> Einstellungen -> Allgemein -> REST API die Option "Enable CORS" aktivieren und die Redmine-URL eintragen (oder *).') %></li>
+    </ul>
+  </li>
+</ol>
+<br>
+<b><%= l(:'rocketchat.settings.permissions') %></b>
+<ul>
+  <li><%= l(:'rocketchat.settings.role_permissions') %> (<a href="/roles"><%= l(:'rocketchat.settings.enable_iframe_roles') %></a>)</li>
+  <li><%= l(:'rocketchat.settings.default_module') %></li>
+</ul>

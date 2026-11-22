@@ -1,0 +1,150 @@
+@import url("rocketchat.css");
+
+:root {
+  --rc-sidebar-width: 30em;
+}
+
+#rocketchat-sidebar {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: var(--rc-sidebar-width, 30em);
+  height: 100vh;
+  border-left: 1px solid var(--rc-theme-border, #cbd2d9);
+  background-color: var(--rc-theme-bg, #fff);
+  z-index: 1000;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease;
+}
+
+.rc-SidebarResizer {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10001;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.rc-SidebarResizer::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 36px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.5);
+  transition: background-color 0.15s ease, height 0.15s ease;
+}
+
+.rc-SidebarResizer:hover,
+body.rc-sidebar-resizing .rc-SidebarResizer {
+  background: rgba(29, 116, 245, 0.18);
+}
+
+.rc-SidebarResizer:hover::after,
+body.rc-sidebar-resizing .rc-SidebarResizer::after {
+  background: var(--rc-theme-primary, #1d74f5);
+  height: 56px;
+}
+
+body.rc-sidebar-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.rc-sidebar-resizing #wrapper,
+body.rc-sidebar-resizing #rocketchat-sidebar {
+  transition: none !important;
+}
+
+body.rc-sidebar-collapsed #rocketchat-sidebar {
+  transform: translateX(100%);
+}
+
+#wrapper {
+  margin-right: var(--rc-sidebar-width, 30em);
+  transition: margin-right 0.2s ease;
+}
+
+body.rc-sidebar-collapsed #wrapper {
+  margin-right: 0 !important;
+}
+
+/* Main Menu "Chat" Tab — Hidden while sidebar is visible, pinned cleanly on the same tab row at the right edge */
+#main-menu li:has(a.rocket-chat) {
+  display: none;
+}
+
+body.rc-sidebar-collapsed #main-menu li:has(a.rocket-chat) {
+  display: inline-block !important;
+  float: none !important;
+  position: absolute !important;
+  right: var(--rc-tabs-buttons-offset, 16px) !important;
+  top: 0 !important;
+  margin: 0 !important;
+  z-index: 40;
+}
+
+/* Blink / Pulse animation on the Chat menu tab when the sidebar is collapsed */
+@keyframes rcChatTabBlink {
+  0%, 100% {
+    background-color: transparent;
+    color: inherit;
+    box-shadow: none;
+    transform: scale(1);
+  }
+  25%, 75% {
+    background-color: var(--rc-theme-primary, #628DB6);
+    color: #ffffff !important;
+    box-shadow: 0 0 0 4px rgba(98, 141, 182, 0.35);
+    border-radius: 50em;
+    transform: scale(1.06);
+  }
+  50% {
+    background-color: transparent;
+    color: inherit;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+#main-menu li a.rocket-chat.rc-tab-blink {
+  animation: rcChatTabBlink 1.1s ease-in-out 2;
+  border-radius: 50em !important;
+}
+
+#rocketchat-content {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  #rocketchat-sidebar {
+    display: none !important;
+  }
+  #wrapper {
+    margin-right: 0px !important;
+  }
+  #main-menu li:has(a.rocket-chat) {
+    display: inline-block !important;
+    float: none !important;
+    position: absolute !important;
+    right: var(--rc-tabs-buttons-offset, 16px) !important;
+    top: 0 !important;
+    margin: 0 !important;
+    z-index: 40;
+  }
+  #rocketchat-content {
+    display: block;
+  }
+  #rocketchat-content .rc-SidebarToggleBtn {
+    display: none !important;
+  }
+}

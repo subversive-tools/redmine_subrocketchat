@@ -1,0 +1,8 @@
+<!-- app/views/rocket_chat/_sidebar.html.erb -->
+<% proj = (defined?(project) && project.present?) ? project : @project %>
+<% if proj %>
+<div id="rocketchat-sidebar">
+  <div id="rocketchat-sidebar-resizer" class="rc-SidebarResizer" title="<%= l(:'rocketchat.ui.resize_sidebar', default: 'Breite ändern (Doppelklick zum Zurücksetzen)') %>"></div>
+  <%= render partial: 'rocket_chat/chat_widget', locals: { project: proj, mode: 'sidebar' } %>
+</div>
+<% end %>

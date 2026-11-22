@@ -1,0 +1,31 @@
+<!-- app/views/rocket_chat/_chat_widget.html.erb -->
+<%
+  proj = (defined?(project) && project.present?) ? project : @project
+  issue_obj = (defined?(issue) && issue.present?) ? issue : (@issue if defined?(@issue) && @issue&.persisted?)
+  channel_name = RedmineSubrocketchat::RocketChatHelper.channel_name_for(proj)
+  rc_url = Setting.plugin_redmine_subrocketchat['rocket_chat_url'].to_s.chomp('/')
+%>
+<div class="rc-embedded-wrapper"
+     data-project-id="<%= proj.identifier %>"
+     data-channel-name="<%= channel_name %>"
+     data-rc-url="<%= rc_url %>"
+     data-session-url="<%= "/projects/#{proj.identifier}/rocket_chat/session" %>"
+     data-issues-url="<%= "/projects/#{proj.identifier}/rocket_chat/issues" %>"
+     data-thread-base-url="<%= "/projects/#{proj.identifier}/rocket_chat/issue_thread" %>"
+     data-issue-id="<%= issue_obj&.id %>"
+     data-issue-subject="<%= issue_obj&.subject %>"
+     data-issue-thread-id="<%= issue_obj.respond_to?(:rocketchat_thread_id) ? issue_obj&.rocketchat_thread_id : '' %>"
+     data-mode="<%= mode %>">
+
+  <!-- Target mount container for @embeddedchat/react -->
+  <div class="rc-EmbeddedMount"></div>
+
+  <!-- #1234 Issue Autocomplete Dropdown -->
+  <div class="rc-IssueAutocomplete" style="display: none;">
+    <div class="rc-IssueAutocomplete-header">
+      <span><%= l(:'rocketchat.autocomplete.title', default: 'Ticket verlinken oder Thread öffnen (#)') %></span>
+      <small><%= l(:'rocketchat.autocomplete.hint', default: '↑↓ Auswahl · Enter: Link · Shift+Enter: Thread') %></small>
+    </div>
+    <ul class="rc-IssueAutocomplete-list"></ul>
+  </div>
+</div>

@@ -1,0 +1,498 @@
+/* Shared styles for EmbeddedChat in Redmine — Adaptive to the active Redmine Theme */
+
+:root {
+  --rc-theme-font: inherit;
+  --rc-theme-font-size: 13px;
+  --rc-theme-bg: #ffffff;
+  --rc-theme-fg: #212136;
+  --rc-theme-primary: #628DB6;
+  --rc-theme-secondary: #f4f6f8;
+  --rc-theme-border: #d8dee4;
+}
+
+#rocketchat-sidebar,
+#rocketchat-sidebar-fab {
+  display: none;
+}
+
+.rc-tab-container {
+  height: calc(100vh - 180px);
+  min-height: 540px;
+  border: 1px solid var(--rc-theme-border, #d8dee4);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--rc-theme-bg, #ffffff);
+}
+
+.rc-embedded-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--rc-theme-bg, #ffffff);
+  color: var(--rc-theme-fg, #212136);
+  font-family: var(--rc-theme-font, inherit);
+  font-size: var(--rc-theme-font-size, 13px);
+}
+
+/* Header & Action Buttons adapted to Redmine Theme */
+.rc-ThreadSwitchBtn,
+.rc-ChannelSwitchBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--rc-theme-secondary, #eeeeee);
+  color: var(--rc-theme-fg, #333333) !important;
+  border: 1px solid var(--rc-theme-border, #cccccc);
+  border-radius: 3px;
+  height: 22px;
+  line-height: 20px;
+  padding: 0 7px;
+  font-family: var(--rc-theme-font, inherit);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.rc-ThreadSwitchBtn:hover,
+.rc-ChannelSwitchBtn:hover,
+.rc-ThreadSwitchBtn.is-active {
+  background: var(--rc-theme-primary, #628DB6);
+  border-color: var(--rc-theme-primary, #628DB6);
+  color: #ffffff !important;
+}
+
+.rc-ExternalLinkBtn,
+.rc-SidebarToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: var(--rc-theme-fg, #475569) !important;
+  background: transparent;
+  border: 1px solid transparent;
+  text-decoration: none !important;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.78;
+}
+
+.rc-ExternalLinkBtn:hover,
+.rc-SidebarToggleBtn:hover {
+  background: var(--rc-theme-secondary, rgba(0, 0, 0, 0.06));
+  border-color: var(--rc-theme-border, transparent);
+  opacity: 1;
+}
+
+/* EmbeddedChat Mount Area & Theme Overrides */
+.rc-EmbeddedMount {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.rc-EmbeddedMount .ec-embedded-chat,
+.rc-EmbeddedMount .ec-embedded-chat *,
+.rc-EmbeddedMount .ec-embedded-chat *::before,
+.rc-EmbeddedMount .ec-embedded-chat *::after {
+  box-sizing: border-box !important;
+  font-family: var(--rc-theme-font, inherit) !important;
+}
+
+.rc-EmbeddedMount .ec-embedded-chat {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: var(--rc-theme-bg, #ffffff) !important;
+  color: var(--rc-theme-fg, #212136) !important;
+  font-size: var(--rc-theme-font-size, 13px) !important;
+}
+
+/* Compact 1-Row Header matching Redmine #top-menu height */
+.rc-EmbeddedMount .ec-chat-header {
+  display: flex !important;
+  flex-direction: row-reverse !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: var(--rc-top-menu-height, 28px) !important;
+  min-height: var(--rc-top-menu-height, 28px) !important;
+  max-height: var(--rc-top-menu-height, 28px) !important;
+  padding: 0 6px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  background: var(--rc-theme-secondary, #f4f6f8) !important;
+  border-bottom: 1px solid var(--rc-theme-border, #d8dee4) !important;
+  box-shadow: none !important;
+  gap: 4px !important;
+}
+
+/* First child in DOM (placed on the right by row-reverse): always-visible icon buttons */
+.rc-EmbeddedMount .ec-chat-header > div:first-of-type {
+  padding: 0 !important;
+  min-width: 0 !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  justify-content: flex-end !important;
+  height: 100% !important;
+}
+
+/* Hide room title and hash icon in header completely — only show icon buttons */
+.rc-EmbeddedMount .ec-chat-header > div:first-of-type > div:first-of-type {
+  display: none !important;
+}
+
+/* Hide user avatar in header */
+.rc-EmbeddedMount .ec-chat-header img[alt="avatar"] {
+  display: none !important;
+}
+
+/* Header icon button row (always visible on the right) */
+.rc-EmbeddedMount .ec-chat-header > div:first-of-type > div:last-of-type {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+  width: auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* Second child in DOM (DynamicHeader when in a thread or filter, placed on the left by row-reverse in the exact same row!) */
+.rc-EmbeddedMount .ec-chat-header > div:nth-of-type(2) {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+.rc-EmbeddedMount .ec-chat-header > div:nth-of-type(2) > div {
+  min-width: 0 !important;
+  width: 100% !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.rc-EmbeddedMount .ec-chat-header > div:nth-of-type(2) h6 {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  color: var(--rc-theme-fg, #212136) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+}
+
+/* Scale all EmbeddedChat buttons & icons to Redmine theme size */
+.rc-EmbeddedMount .ec-chat-header button,
+.rc-EmbeddedMount .ec-message-toolbox button,
+.rc-EmbeddedMount .ec-chat-input-formatting-toolbar button {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  padding: 2px !important;
+  border-radius: 3px !important;
+}
+
+.rc-EmbeddedMount .ec-chat-header svg,
+.rc-EmbeddedMount .ec-message-toolbox svg,
+.rc-EmbeddedMount .ec-chat-input-formatting-toolbar svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* General Buttons inside EmbeddedChat (JOIN, Login, Reply, Modal, Close buttons) */
+.rc-EmbeddedMount button[class*="ec-button"],
+body button.ec-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-family: var(--rc-theme-font, inherit) !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  padding: 6px 14px !important;
+  min-height: 28px !important;
+  height: auto !important;
+  border-radius: 3px !important;
+}
+
+.rc-EmbeddedMount button.ec-button--small,
+body button.ec-button.ec-button--small {
+  padding: 4px 10px !important;
+  min-height: 22px !important;
+  font-size: 11px !important;
+}
+
+.rc-EmbeddedMount button.ec-button-square,
+body button.ec-button.ec-button-square {
+  padding: 2px !important;
+}
+
+/* Chat Layout & Scrollable Message List */
+.rc-EmbeddedMount .ec-chat-layout {
+  flex: 1 1 0% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.rc-EmbeddedMount .ec-chat-layout > .ec-box {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.rc-EmbeddedMount .ec-chat-body {
+  flex: 1 1 0% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-top: 8px !important;
+  background: var(--rc-theme-bg, #ffffff) !important;
+}
+
+.rc-EmbeddedMount .ec-chat-body > :last-child {
+  margin-top: auto !important;
+}
+
+/* Messages Typography & Compact Spacing */
+.rc-EmbeddedMount .ec-message {
+  padding: 4px 10px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  font-size: var(--rc-theme-font-size, 13px) !important;
+}
+
+.rc-EmbeddedMount .ec-message-body {
+  font-size: var(--rc-theme-font-size, 13px) !important;
+  line-height: 1.4 !important;
+  color: var(--rc-theme-fg, #212136) !important;
+}
+
+.rc-EmbeddedMount .ec-message a {
+  color: var(--rc-theme-primary, #1d74f5) !important;
+  text-decoration: none !important;
+}
+
+.rc-EmbeddedMount .ec-message a:hover {
+  text-decoration: underline !important;
+}
+
+.rc-EmbeddedMount .ec-message-divider {
+  font-size: 11px !important;
+  margin-top: 4px !important;
+  margin-bottom: 6px !important;
+}
+
+/* Chat Input Box at Bottom */
+.rc-EmbeddedMount .ec-chat-input {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.rc-EmbeddedMount .ec-chat-input > div:last-of-type {
+  margin: 4px 8px 6px 8px !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 16px) !important;
+  border-color: var(--rc-theme-border, #d8dee4) !important;
+  border-radius: 4px !important;
+}
+
+.rc-EmbeddedMount .ec-chat-input > div:last-of-type.focused {
+  border-color: var(--rc-theme-primary, #628DB6) !important;
+}
+
+.rc-EmbeddedMount .ec-chat-input textarea,
+.rc-EmbeddedMount .ec-chat-input input {
+  min-width: 0 !important;
+  width: 100% !important;
+  font-family: var(--rc-theme-font, inherit) !important;
+  font-size: var(--rc-theme-font-size, 13px) !important;
+  line-height: 1.35 !important;
+}
+
+.rc-EmbeddedMount .ec-chat-input-formatting-toolbar {
+  flex-wrap: wrap !important;
+  gap: 2px !important;
+  padding: 2px 4px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  background: var(--rc-theme-secondary, #f4f6f8) !important;
+  border-top: 1px solid var(--rc-theme-border, #e5e7eb) !important;
+}
+
+/* #1234 Issue Autocomplete Dropdown */
+.rc-IssueAutocomplete {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 78px;
+  max-height: 250px;
+  background: var(--rc-theme-bg, #ffffff);
+  border: 1px solid var(--rc-theme-border, #cbd2d9);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--rc-theme-font, inherit);
+}
+
+.rc-IssueAutocomplete-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: var(--rc-theme-secondary, #f4f6f8);
+  border-bottom: 1px solid var(--rc-theme-border, #e4e7eb);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rc-theme-fg, #475569);
+}
+
+.rc-IssueAutocomplete-header small {
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 10px;
+}
+
+.rc-IssueAutocomplete-list {
+  list-style: none;
+  margin: 0;
+  padding: 3px 0;
+  overflow-y: auto;
+  max-height: 210px;
+}
+
+.rc-IssueAutocomplete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--rc-theme-border, #f1f5f9);
+  font-size: 12px;
+  color: var(--rc-theme-fg, #1e293b);
+}
+
+.rc-IssueAutocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.rc-IssueAutocomplete-item:hover,
+.rc-IssueAutocomplete-item.is-selected {
+  background: var(--rc-theme-secondary, #eff6ff);
+}
+
+.rc-IssueAutocomplete-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.rc-IssueAutocomplete-title {
+  font-weight: 600;
+  color: var(--rc-theme-fg, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rc-IssueAutocomplete-title .rc-issue-id {
+  color: var(--rc-theme-primary, #628DB6);
+  margin-right: 4px;
+}
+
+.rc-IssueAutocomplete-meta {
+  font-size: 11px;
+  opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rc-IssueAutocomplete-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rc-IssueAutocomplete-actionBtn {
+  padding: 1px 6px;
+  height: 20px;
+  line-height: 18px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  border: 1px solid var(--rc-theme-border, #cbd5e1);
+  background: var(--rc-theme-bg, #ffffff);
+  color: var(--rc-theme-fg, #334155);
+  cursor: pointer;
+}
+
+.rc-IssueAutocomplete-actionBtn:hover,
+.rc-IssueAutocomplete-actionBtn.is-thread:hover {
+  background: var(--rc-theme-primary, #628DB6);
+  border-color: var(--rc-theme-primary, #628DB6);
+  color: #ffffff;
+}
+
+.rc-IssueAutocomplete-actionBtn.is-thread {
+  background: var(--rc-theme-secondary, #eff6ff);
+  color: var(--rc-theme-primary, #1d4ed8);
+}
+
+/* Contextual Action Link ("Chat") between "Bearbeiten" and "Beobachten" above & below the Issue Box */
+.rc-ContextualThreadLink {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 3px;
+}
+
+.rc-ContextualThreadLink-dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+  margin-left: 1px;
+}
+
+.rc-ContextualThreadLink.is-active .rc-ContextualThreadLink-dot {
+  display: inline-block;
+}
