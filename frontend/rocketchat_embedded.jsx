@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EmbeddedChat, useMessageStore } from '@embeddedchat/react';
+import { EmbeddedChat, useMessageStore, useUserStore, useLoginStore, useTotpStore } from '@embeddedchat/react';
 
 // Expose message store globally so Redmine buttons can open/close threads directly
 window.RedmineRocketChatStore = useMessageStore;
@@ -218,25 +218,52 @@ function buildRedmineAdaptiveTheme() {
   };
 }
 
+const AUTH_PROP_PASSWORD = { flow: 'PASSWORD' };
+
 function RedmineEmbeddedChatApp({ config, isSidebar, onToggleSidebar }) {
   const [rcTheme] = useState(() => buildRedmineAdaptiveTheme());
-
-  const authProp = config.auth_token
-    ? {
-      flow: 'TOKEN',
-      credentials: {
-        resume: config.auth_token,
-      },
-    }
-    : {
-      flow: 'PASSWORD',
-    };
+  const [authProp] = useState(() =>
+    config.auth_token
+      ? {
+          flow: 'TOKEN',
+          credentials: {
+            resume: config.auth_token,
+          },
+        }
+      : AUTH_PROP_PASSWORD
+  );
+  const [handleToggleSidebar] = useState(() => () => {
+    if (onToggleSidebar) onToggleSidebar();
+  });
 
   useEffect(() => {
     if (config.auth_token && typeof localStorage !== 'undefined') {
       localStorage.setItem('ec_token', config.auth_token);
     }
   }, [config.auth_token]);
+
+  // Automatically open the Login modal whenever the user is unauthenticated (after initial autoLogin completes)
+  useEffect(() => {
+    if (!useUserStore || !useLoginStore || !useTotpStore) return;
+    const syncLoginModal = () => {
+      const isAuth = useUserStore.getState()?.isUserAuthenticated;
+      const loginState = useLoginStore.getState();
+      const isTotp = useTotpStore.getState()?.isTotpModalOpen;
+      if (!isAuth && !loginState?.isLoginIn && !isTotp && !loginState?.isLoginModalOpen) {
+        loginState?.setIsLoginModalOpen?.(true);
+      }
+    };
+    const t = setTimeout(syncLoginModal, 450);
+    const unsubUser = useUserStore.subscribe ? useUserStore.subscribe(syncLoginModal) : null;
+    const unsubLogin = useLoginStore.subscribe ? useLoginStore.subscribe(syncLoginModal) : null;
+    const unsubTotp = useTotpStore.subscribe ? useTotpStore.subscribe(syncLoginModal) : null;
+    return () => {
+      clearTimeout(t);
+      if (typeof unsubUser === 'function') unsubUser();
+      if (typeof unsubLogin === 'function') unsubLogin();
+      if (typeof unsubTotp === 'function') unsubTotp();
+    };
+  }, []);
 
   return (
     <EmbeddedChat
@@ -248,7 +275,7 @@ function RedmineEmbeddedChatApp({ config, isSidebar, onToggleSidebar }) {
       showUsername={true}
       hideHeader={false}
       isClosable={isSidebar}
-      setClosableState={onToggleSidebar}
+      setClosableState={handleToggleSidebar}
       theme={rcTheme}
       width="100%"
       height="100%"

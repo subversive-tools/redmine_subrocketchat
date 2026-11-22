@@ -3,9 +3,12 @@
  * Reproducible build script for redmine_subrocketchat frontend bundle.
  *
  * 1. Patches @embeddedchat/react/dist/esm/index.js:
- *    - Exports `useMessageStore` (`Cg`) alongside `EmbeddedChat` so Redmine UI controls can open/close threads directly.
+ *    - Exports `useMessageStore` (`Cg`), `useUserStore` (`sg`), `useLoginStore` (`mg`), and `useTotpStore` (`dg`).
  *    - Adds an "In Rocket.Chat öffnen" action with an expand icon to the ChatHeader kebab menu.
  *    - Strips Markdown/links/newlines from the ChatHeader thread title via `window.__rcFormatThreadTitle`.
+ *    - Supports `Enter` key submission inside the TOTP modal input.
+ *    - Hides the unauthenticated bottom `ChatInput` bar (`"Sign in to chat"` / `"JOIN"`) via `display: "none"` while keeping its ref mounted.
+ *    - Fixes EmbeddedChat 0.2.3 + React 18.3.1 infinite re-render loops (`React error #301`) by using shallow equality in Zustand's `useSyncExternalStoreWithSelector` wrapper and removing the redundant `setConfig(props)` `useEffect` in `EmbeddedChat`.
  * 2. Bundles `rocketchat_embedded.jsx` into `../assets/javascripts/rocketchat_embedded.js` using esbuild.
  */
 
@@ -25,41 +28,10 @@ if (!fs.existsSync(ecIndexPath)) {
 let ecCode = fs.readFileSync(ecIndexPath, 'utf8');
 
 // 1. Export useMessageStore (Cg), useUserStore (sg), useLoginStore (mg), and useTotpStore (dg)
-if (!ecCode.includes('Cg as useMessageStore')) {
+if (!ecCode.includes('sg as useUserStore')) {
   ecCode = ecCode.replace(
-    'export{ws as EmbeddedChat,x as darkTheme,w as defaultTheme};',
-    'export{ws as EmbeddedChat,Cg as useMessageStore,sg as useUserStore,mg as useLoginStore,dg as useTotpStore,x as darkTheme,w as defaultTheme};'
-  );
-} else if (!ecCode.includes('sg as useUserStore')) {
-  ecCode = ecCode.replace(
-    'export{ws as EmbeddedChat,Cg as useMessageStore,x as darkTheme,w as defaultTheme};',
-    'export{ws as EmbeddedChat,Cg as useMessageStore,sg as useUserStore,mg as useLoginStore,dg as useTotpStore,x as darkTheme,w as defaultTheme};'
-  );
-}
-
-// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") visually when not authenticated (`!oe`)
-// (Must keep the DOM node mounted with display:none so ChatInput's useEffect ref `A.current` is never null!)
-if (!ecCode.includes('style:le({},l,!oe&&{display:"none"})')) {
-  ecCode = ecCode.replace(
-    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}',
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
-  );
-  ecCode = ecCode.replace(
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:l}',
-    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
-  );
-}
-
-// 6. Automatically show the Login modal directly whenever the user is not authenticated and not in the TOTP step
-// (Call all Zustand hook selectors unconditionally at top level of tb() so React hook order never changes!)
-if (!ecCode.includes('__rcIsAuth=sg(function(e){return e.isUserAuthenticated})')) {
-  ecCode = ecCode.replace(
-    'X=mg((function(e){return e.isLoginModalOpen}))||(!sg(function(e){return e.isUserAuthenticated})&&!mg(function(e){return e.isLoginIn})&&!dg(function(e){return e.isTotpModalOpen}))',
-    '__rcModalOpen=mg((function(e){return e.isLoginModalOpen})),__rcIsAuth=sg(function(e){return e.isUserAuthenticated}),__rcIsLoginIn=mg(function(e){return e.isLoginIn}),__rcIsTotp=dg(function(e){return e.isTotpModalOpen}),X=__rcModalOpen||(!__rcIsAuth&&!__rcIsLoginIn&&!__rcIsTotp)'
-  );
-  ecCode = ecCode.replace(
-    'X=mg((function(e){return e.isLoginModalOpen}))',
-    '__rcModalOpen=mg((function(e){return e.isLoginModalOpen})),__rcIsAuth=sg(function(e){return e.isUserAuthenticated}),__rcIsLoginIn=mg(function(e){return e.isLoginIn}),__rcIsTotp=dg(function(e){return e.isTotpModalOpen}),X=__rcModalOpen||(!__rcIsAuth&&!__rcIsLoginIn&&!__rcIsTotp)'
+    /export\{ws as EmbeddedChat[^}]*\};/,
+    'export{ws as EmbeddedChat,Cg as useMessageStore,sg as useUserStore,mg as useLoginStore,dg as useTotpStore};'
   );
 }
 
@@ -84,6 +56,41 @@ if (!ecCode.includes('onKeyDown:function(e){"Enter"===e.key&&')) {
   ecCode = ecCode.replace(
     'd(V,{type:"password",onChange:function(e){n(e.target.value)},placeholder:"123456"})',
     'd(V,{type:"password",onChange:function(e){n(e.target.value)},onKeyDown:function(e){"Enter"===e.key&&(e.preventDefault(),null!==i&&null!==f&&c(f,i,l),n(void 0))},placeholder:"123456"})'
+  );
+}
+
+// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") visually when not authenticated (`!oe`)
+if (!ecCode.includes('style:le({},l,!oe&&{display:"none"})')) {
+  ecCode = ecCode.replace(
+    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}',
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
+  );
+  ecCode = ecCode.replace(
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:l}',
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:le({},l,!oe&&{display:"none"})}'
+  );
+}
+
+// 6. Ensure LoginForm uses standard single Zustand selector (opened automatically via RedmineEmbeddedChatApp useEffect)
+ecCode = ecCode.replace(
+  '__rcModalOpen=mg((function(e){return e.isLoginModalOpen})),__rcIsAuth=sg(function(e){return e.isUserAuthenticated}),__rcIsLoginIn=mg(function(e){return e.isLoginIn}),__rcIsTotp=dg(function(e){return e.isTotpModalOpen}),X=__rcModalOpen||(!__rcIsAuth&&!__rcIsLoginIn&&!__rcIsTotp)',
+  'X=mg((function(e){return e.isLoginModalOpen}))'
+);
+
+// 7. Fix EmbeddedChat 0.2.3 + React 18.3.1 infinite re-render bug (React error #301):
+// a) Remove redundant `useEffect(() => setConfig(props), [props])` at the top of `zs` (EmbeddedChat root component)
+ecCode = ecCode.replace(
+  'zs=function(e){var g=he(t((function(){return e})),2),c=g[0],I=g[1];a((function(){I(e)}),[e]);',
+  'zs=function(e){var g=he(t((function(){return e})),2),c=e,I=g[1];'
+);
+
+// b) Default Zustand's equalityFn in `ig` to shallow equality so object-returning selectors in EmbeddedChat never cause infinite re-render loops
+if (!ecCode.includes('function __rcShallow(a,b)')) {
+  const shallowFn =
+    'function __rcShallow(a,b){if(Object.is(a,b))return!0;if("object"!=typeof a||null===a||"object"!=typeof b||null===b)return!1;var k=Object.keys(a);if(k.length!==Object.keys(b).length)return!1;for(var i=0;i<k.length;i++)if(!Object.prototype.hasOwnProperty.call(b,k[i])||!Object.is(a[k[i]],b[k[i]]))return!1;return!0}';
+  ecCode = ecCode.replace(
+    'var t=Ig(e.subscribe,e.getState,e.getServerState||e.getState,g,c);',
+    shallowFn + 'var t=Ig(e.subscribe,e.getState,e.getServerState||e.getState,g,c||__rcShallow);'
   );
 }
 
