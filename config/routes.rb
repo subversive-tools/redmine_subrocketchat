@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  match 'rocket_chat/admin_setup', to: 'rocket_chat#admin_setup', via: :post
   match 'projects/:project_id/rocket_chat', to: 'rocket_chat#show', via: :get
   match 'projects/:project_id/rocket_chat/session', to: 'rocket_chat#session_config', via: :get
   match 'projects/:project_id/rocket_chat/issues', to: 'rocket_chat#issues', via: :get

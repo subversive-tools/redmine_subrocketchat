@@ -3,10 +3,165 @@
 
 class RocketChatController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:proxy]
-  before_action :find_project, :authorize
+  before_action :require_admin, only: [:admin_setup]
+  before_action :find_project, :authorize, except: [:admin_setup]
 
   def show
     # Renders app/views/rocket_chat/show.html.erb
+  end
+
+  # POST /rocket_chat/admin_setup
+  # 1-Click Setup Wizard & Connection Tester for the plugin settings page (Admin only)
+  def admin_setup
+    op = params[:operation].to_s
+    rc_url = params[:rocket_chat_url].to_s.strip.chomp('/')
+    rc_internal = params[:rocket_chat_url_internal].to_s.strip.chomp('/')
+    base_url = (rc_internal.presence || rc_url)
+
+    if base_url.blank?
+      return render json: { success: false, error: I18n.t('rocketchat.settings.wizard.missing_url', default: 'Please enter the Rocket.Chat URL first.') }, status: :unprocessable_entity
+    end
+
+    case op
+    when 'connect_login'
+      username = params[:username].to_s.strip
+      password = params[:password].to_s
+      if username.blank? || password.blank?
+        return render json: { success: false, error: I18n.t('rocketchat.settings.wizard.missing_credentials', default: 'Please enter both username and password.') }, status: :unprocessable_entity
+      end
+
+      login_res = rc_raw_request("#{base_url}/api/v1/login", method: :post, payload: { user: username, password: password })
+      unless login_res[:ok] && login_res[:json].dig('data', 'authToken').present?
+        err_msg = login_res[:json]['error'] || login_res[:json]['message'] || login_res[:error] || 'Login failed'
+        return render json: { success: false, error: err_msg }, status: :unprocessable_entity
+      end
+
+      user_id = login_res[:json].dig('data', 'userId')
+      temp_token = login_res[:json].dig('data', 'authToken')
+      final_token = temp_token
+      token_type = 'login_token'
+
+      # Try to create or regenerate a non-expiring Personal Access Token (`redmine_subrocketchat`) if the user has permission
+      pat_name = 'redmine_subrocketchat'
+      pat_res = rc_raw_request(
+        "#{base_url}/api/v1/users.generatePersonalAccessToken",
+        method: :post,
+        headers: { 'X-User-Id' => user_id, 'X-Auth-Token' => temp_token },
+        payload: { tokenName: pat_name, bypassTwoFactor: true }
+      )
+      if !pat_res[:ok] && pat_res[:json]['errorType'] == 'error-token-already-exists'
+        pat_res = rc_raw_request(
+          "#{base_url}/api/v1/users.regeneratePersonalAccessToken",
+          method: :post,
+          headers: { 'X-User-Id' => user_id, 'X-Auth-Token' => temp_token },
+          payload: { tokenName: pat_name }
+        )
+      end
+      if pat_res[:ok] && pat_res[:json]['token'].present?
+        final_token = pat_res[:json]['token']
+        token_type = 'personal_access_token'
+      end
+
+      # Persist immediately into Setting.plugin_redmine_subrocketchat so the admin does not even lose it if they forget to click Save
+      current_settings = (Setting.plugin_redmine_subrocketchat || {}).dup
+      current_settings['rocket_chat_url'] = rc_url if rc_url.present?
+      current_settings['rocket_chat_url_internal'] = rc_internal
+      current_settings['rocket_chat_user_id'] = user_id
+      current_settings['rocket_chat_token'] = final_token
+      Setting.plugin_redmine_subrocketchat = current_settings
+
+      me_info = login_res[:json].dig('data', 'me') || {}
+      render json: {
+        success: true,
+        user_id: user_id,
+        token: final_token,
+        token_type: token_type,
+        username: me_info['username'] || username,
+        name: me_info['name'] || username,
+        roles: me_info['roles'] || []
+      }
+
+    when 'test_connection'
+      user_id = params[:rocket_chat_user_id].to_s.strip.presence || Setting.plugin_redmine_subrocketchat['rocket_chat_user_id']
+      token = params[:rocket_chat_token].to_s.strip.presence || Setting.plugin_redmine_subrocketchat['rocket_chat_token']
+
+      if user_id.blank? || token.blank?
+        return render json: { success: false, error: I18n.t('rocketchat.settings.wizard.missing_token', default: 'User ID or API Token is missing. Use the 1-Click Login above or enter them manually.') }, status: :unprocessable_entity
+      end
+
+      me_res = rc_raw_request(
+        "#{base_url}/api/v1/me",
+        method: :get,
+        headers: { 'X-User-Id' => user_id, 'X-Auth-Token' => token }
+      )
+      unless me_res[:ok] && me_res[:json]['_id'].present?
+        err_msg = me_res[:json]['error'] || me_res[:json]['message'] || me_res[:error] || 'Authentication failed'
+        return render json: { success: false, error: err_msg }, status: :unprocessable_entity
+      end
+
+      info_res = rc_raw_request(
+        "#{base_url}/api/info",
+        method: :get,
+        headers: { 'X-User-Id' => user_id, 'X-Auth-Token' => token }
+      )
+      rc_version = info_res[:json].dig('info', 'version') || info_res[:json]['version'] || 'OK'
+
+      render json: {
+        success: true,
+        username: me_res[:json]['username'],
+        name: me_res[:json]['name'],
+        roles: me_res[:json]['roles'] || [],
+        rc_version: rc_version
+      }
+
+    when 'apply_quick_setup'
+      # 1. Grant :access_chat permission to selected role IDs (or all non-builtin roles)
+      role_ids = Array(params[:role_ids]).map(&:to_i).reject(&:zero?)
+      Role.where(builtin: 0).find_each do |role|
+        if role_ids.include?(role.id)
+          role.add_permission!(:access_chat) unless role.allowed_to?(:access_chat)
+        else
+          role.remove_permission!(:access_chat) if role.allowed_to?(:access_chat)
+        end
+      end
+
+      # 2. Optionally add 'rocket_chat' to Redmine's default_projects_modules
+      if params[:enable_default_module].to_s == 'true'
+        mods = Array(Setting.default_projects_modules).map(&:to_s)
+        Setting.default_projects_modules = (mods | ['rocket_chat'])
+      end
+
+      # 3. Optionally enable rocket_chat module & sync channels on all active projects
+      synced_projects = 0
+      if params[:enable_all_projects].to_s == 'true'
+        Project.active.find_each do |proj|
+          unless proj.module_enabled?(:rocket_chat)
+            proj.enabled_module_names = (proj.enabled_module_names | ['rocket_chat'])
+          end
+          RedmineSubrocketchat::RocketChatHelper.sync_channel_and_members(proj)
+          synced_projects += 1
+        rescue StandardError => e
+          Rails.logger.warn("Subrocketchat quick setup sync warning for #{proj.identifier}: #{e.message}")
+        end
+      elsif params[:sync_active_projects].to_s == 'true'
+        Project.active.find_each do |proj|
+          next unless proj.module_enabled?(:rocket_chat)
+
+          RedmineSubrocketchat::RocketChatHelper.sync_channel_and_members(proj)
+          synced_projects += 1
+        rescue StandardError => e
+          Rails.logger.warn("Subrocketchat quick setup sync warning for #{proj.identifier}: #{e.message}")
+        end
+      end
+
+      render json: {
+        success: true,
+        roles_updated: role_ids.size,
+        synced_projects: synced_projects
+      }
+    else
+      render json: { success: false, error: "Unknown operation: #{op}" }, status: :bad_request
+    end
   end
 
   # GET /projects/:project_id/rocket_chat/session
@@ -341,5 +496,25 @@ class RocketChatController < ApplicationController
 
   def find_project
     @project = Project.find(params[:project_id])
+  end
+
+  def rc_raw_request(url_str, method: :get, headers: {}, payload: nil)
+    uri = URI(url_str)
+    req_class = method == :post ? Net::HTTP::Post : Net::HTTP::Get
+    req = req_class.new(uri)
+    req['Accept'] = 'application/json'
+    headers.each { |k, v| req[k] = v if v.present? }
+    if payload
+      req['Content-Type'] = 'application/json'
+      req.body = payload.to_json
+    end
+
+    res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 8, read_timeout: 15) do |http|
+      http.request(req)
+    end
+    parsed = JSON.parse(res.body) rescue {}
+    { ok: res.is_a?(Net::HTTPSuccess) && (parsed['status'] == 'success' || parsed['success'] != false), code: res.code.to_i, json: parsed }
+  rescue StandardError => e
+    { ok: false, code: 0, json: {}, error: e.message }
   end
 end

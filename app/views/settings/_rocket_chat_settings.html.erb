@@ -1,152 +1,443 @@
 <!-- app/views/settings/_rocket_chat_settings.html.erb -->
-<h3><%= l(:'rocketchat.settings.title') %></h3>
+<%
+  s = Setting.plugin_redmine_subrocketchat || {}
+  has_credentials = s['rocket_chat_user_id'].present? && s['rocket_chat_token'].present?
+  non_builtin_roles = Role.where(builtin: 0).sorted
+  default_mod_enabled = Array(Setting.default_projects_modules).map(&:to_s).include?('rocket_chat')
+%>
 
-<%= l(:'rocketchat.settings.description') %>
-<br><br>
-<h4><%= l(:'rocketchat.settings.settings') %></h4>
+<style>
+  .rc-admin-wrap { max-width: 880px; font-size: 13px; line-height: 1.5; }
+  .rc-admin-card {
+    background: #ffffff;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .rc-admin-card h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #eef1f4;
+    padding-bottom: 8px;
+  }
+  .rc-admin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .rc-admin-badge.is-ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .rc-admin-badge.is-warn { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .rc-admin-badge.is-err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .rc-admin-wizard {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 12px 0;
+  }
+  .rc-admin-wizard-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .rc-admin-field { display: flex; flex-direction: column; gap: 3px; }
+  .rc-admin-field label {
+    font-weight: 600;
+    font-size: 12px;
+    color: #374151;
+    margin: 0 !important;
+    width: auto !important;
+    float: none !important;
+    text-align: left !important;
+  }
+  .rc-admin-field input[type="text"],
+  .rc-admin-field input[type="password"] {
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+  }
+  .rc-admin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 13px;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1f2937;
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .rc-admin-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+  .rc-admin-btn.is-primary {
+    background: #2563eb;
+    border-color: #1d4ed8;
+    color: #ffffff;
+  }
+  .rc-admin-btn.is-primary:hover { background: #1d4ed8; }
+  .rc-admin-btn:disabled { opacity: 0.6; cursor: wait; }
+  .rc-admin-status {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    display: none;
+  }
+  .rc-admin-status.is-ok { display: block; background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .rc-admin-status.is-err { display: block; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .rc-admin-details {
+    margin-top: 10px;
+    border-top: 1px solid #eef1f4;
+    padding-top: 8px;
+  }
+  .rc-admin-details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #475569;
+    font-size: 12.5px;
+    user-select: none;
+  }
+  .rc-admin-details summary:hover { color: #1e293b; }
+  .rc-admin-roles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 8px 0 12px 0;
+  }
+  .rc-admin-role-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+  }
+  .rc-admin-hint { color: #64748b; font-size: 12px; margin-top: 2px; display: block; }
+</style>
 
-<p>
-  <%= label_tag 'settings[rocket_chat_url]', l(:'rocketchat.settings.rocket_chat_url') %>
-  <%= text_field_tag 'settings[rocket_chat_url]', Setting.plugin_redmine_subrocketchat['rocket_chat_url'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.rocket_chat_url_hint') %></small>
-</p>
+<div class="rc-admin-wrap">
+  <!-- STEP 1: ROCKET.CHAT SERVER & 1-CLICK BOT CONNECTION -->
+  <div class="rc-admin-card">
+    <h4>
+      <span>1. <%= l(:'rocketchat.settings.step1_title', default: 'Rocket.Chat Server & 1-Click Connection') %></span>
+      <span id="rc-connection-badge" class="rc-admin-badge <%= has_credentials ? 'is-ok' : 'is-warn' %>">
+        <%= has_credentials ? "✔ #{l(:'rocketchat.settings.status_configured', default: 'Token configured')}" : "⚠ #{l(:'rocketchat.settings.status_unconfigured', default: 'Not connected yet')}" %>
+      </span>
+    </h4>
 
-<p>
-  <%= label_tag 'settings[rocket_chat_url_internal]', l(:'rocketchat.settings.rocket_chat_url_internal') %>
-  <%= text_field_tag 'settings[rocket_chat_url_internal]', Setting.plugin_redmine_subrocketchat['rocket_chat_url_internal'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.rocket_chat_url_internal_hint') %></small>
-</p>
+    <p style="margin: 0 0 10px 0;">
+      <%= label_tag 'settings[rocket_chat_url]', l(:'rocketchat.settings.rocket_chat_url', default: 'Rocket.Chat URL') %>
+      <%= text_field_tag 'settings[rocket_chat_url]', s['rocket_chat_url'], size: 55, id: 'rc-input-url', placeholder: 'https://chat.example.com' %>
+      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_url_hint', default: 'Public URL of your Rocket.Chat instance (e.g. https://chat.example.com)') %></span>
+    </p>
 
-<p>
-  <%= label_tag 'settings[rocket_chat_user_id]', l(:'rocketchat.settings.rocket_chat_user_id') %>
-  <%= text_field_tag 'settings[rocket_chat_user_id]', Setting.plugin_redmine_subrocketchat['rocket_chat_user_id'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.rocket_chat_user_id_hint') %></small>
-</p>
+    <!-- 1-Click Login & Token Generator -->
+    <div class="rc-admin-wizard">
+      <div style="font-weight: 600; color: #1e293b;">
+        ⚡ <%= l(:'rocketchat.settings.wizard.title', default: '1-Click Bot / Admin Setup (automatically generates User ID & API Token)') %>
+      </div>
+      <span class="rc-admin-hint">
+        <%= l(:'rocketchat.settings.wizard.subtitle', default: 'Create a user with the "admin" role in Rocket.Chat (e.g. redmine_bot), enter its username and password below, and click Connect. The password is only used once and never stored.') %>
+      </span>
 
-<p>
-  <%= label_tag 'settings[rocket_chat_token]', l(:'rocketchat.settings.rocket_chat_token') %>
-  <%= password_field_tag 'settings[rocket_chat_token]', Setting.plugin_redmine_subrocketchat['rocket_chat_token'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.rocket_chat_token_hint') %></small>
-</p>
+      <div class="rc-admin-wizard-row">
+        <div class="rc-admin-field">
+          <label for="rc-wizard-username"><%= l(:'rocketchat.settings.wizard.username', default: 'Rocket.Chat Bot/Admin Username') %></label>
+          <input type="text" id="rc-wizard-username" placeholder="redmine_bot" autocomplete="off" size="22">
+        </div>
+        <div class="rc-admin-field">
+          <label for="rc-wizard-password"><%= l(:'rocketchat.settings.wizard.password', default: 'Password') %></label>
+          <input type="password" id="rc-wizard-password" placeholder="••••••••" autocomplete="new-password" size="22">
+        </div>
+        <button type="button" id="rc-btn-connect" class="rc-admin-btn is-primary">
+          ⚡ <%= l(:'rocketchat.settings.wizard.connect_btn', default: 'Connect & Generate Token') %>
+        </button>
+        <button type="button" id="rc-btn-test" class="rc-admin-btn">
+          🔌 <%= l(:'rocketchat.settings.wizard.test_btn', default: 'Test Current Connection') %>
+        </button>
+      </div>
 
-<p>
-  <%= label_tag 'settings[redmine_host_url]', l(:'rocketchat.settings.redmine_host_url') %>
-  <%= text_field_tag 'settings[redmine_host_url]', Setting.plugin_redmine_subrocketchat['redmine_host_url'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.redmine_host_url_hint') %></small>
-</p>
+      <div id="rc-wizard-status" class="rc-admin-status"></div>
+    </div>
 
-<hr>
-<h4><%= l(:'rocketchat.settings.features_title', default: 'EmbeddedChat, SSO & Ticket-Threads') %></h4>
+    <!-- Collapsible Manual Token & Advanced Server Settings -->
+    <details class="rc-admin-details" <%= 'open' unless has_credentials %>>
+      <summary><%= l(:'rocketchat.settings.manual_toggle', default: 'Manual Token Entry & Advanced Server URLs (optional)') %></summary>
+      <div style="margin-top: 10px;">
+        <p>
+          <%= label_tag 'settings[rocket_chat_user_id]', l(:'rocketchat.settings.rocket_chat_user_id', default: 'Rocket.Chat User ID') %>
+          <%= text_field_tag 'settings[rocket_chat_user_id]', s['rocket_chat_user_id'], size: 45, id: 'rc-input-user-id' %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_user_id_hint') %></span>
+        </p>
 
-<p>
-  <%= label_tag 'settings[show_sidebar]', l(:'rocketchat.settings.show_sidebar') %>
-  <%= hidden_field_tag 'settings[show_sidebar]', 'false' %>
-  <%= check_box_tag 'settings[show_sidebar]', 'true', Setting.plugin_redmine_subrocketchat['show_sidebar'] == 'true' %>
-  <br>
-  <small><%= l(:'rocketchat.settings.show_sidebar_hint') %></small>
-</p>
+        <p>
+          <%= label_tag 'settings[rocket_chat_token]', l(:'rocketchat.settings.rocket_chat_token', default: 'Rocket.Chat API Token') %>
+          <%= password_field_tag 'settings[rocket_chat_token]', s['rocket_chat_token'], size: 45, id: 'rc-input-token' %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_token_hint') %></span>
+        </p>
 
-<p>
-  <%= label_tag 'settings[auto_login_users]', l(:'rocketchat.settings.auto_login_users', default: 'Automatischer Login (SSO via Token) in EmbeddedChat') %>
-  <%= hidden_field_tag 'settings[auto_login_users]', 'false' %>
-  <%= check_box_tag 'settings[auto_login_users]', 'true', Setting.plugin_redmine_subrocketchat['auto_login_users'] != 'false' %>
-  <br>
-  <small><%= l(:'rocketchat.settings.auto_login_users_hint', default: 'Erstellt beim Öffnen automatisch ein Rocket.Chat Resume-Token für den aktuellen Redmine-Benutzer.') %></small>
-</p>
+        <p>
+          <%= label_tag 'settings[rocket_chat_url_internal]', l(:'rocketchat.settings.rocket_chat_url_internal', default: 'Internal Rocket.Chat URL (optional)') %>
+          <%= text_field_tag 'settings[rocket_chat_url_internal]', s['rocket_chat_url_internal'], size: 45, id: 'rc-input-url-internal', placeholder: 'http://rocketchat:3000' %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_url_internal_hint') %></span>
+        </p>
 
-<p>
-  <%= label_tag 'settings[rocket_chat_token_secret]', l(:'rocketchat.settings.rocket_chat_token_secret', default: 'Rocket.Chat CREATE_TOKENS_FOR_USERS_SECRET (Optional für SSO)') %>
-  <%= password_field_tag 'settings[rocket_chat_token_secret]', Setting.plugin_redmine_subrocketchat['rocket_chat_token_secret'], size: 60 %>
-  <br>
-  <small><%= l(:'rocketchat.settings.rocket_chat_token_secret_hint', default: 'Ab Rocket.Chat 7/8 wird für /api/v1/users.createToken die Env-Variable CREATE_TOKENS_FOR_USERS_SECRET auf dem Rocket.Chat-Server benötigt. Falls leer, loggt sich jeder Benutzer einmalig direkt im EmbeddedChat ein (Session bleibt im Browser gespeichert).') %></small>
-</p>
+        <p>
+          <%= label_tag 'settings[redmine_host_url]', l(:'rocketchat.settings.redmine_host_url', default: 'Redmine Base URL (optional override)') %>
+          <%= text_field_tag 'settings[redmine_host_url]', s['redmine_host_url'], size: 45, placeholder: RedmineSubrocketchat::RocketChatHelper.redmine_base_url %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.redmine_host_url_hint') %></span>
+        </p>
+      </div>
+    </details>
+  </div>
 
-<p>
-  <%= label_tag 'settings[auto_create_users]', l(:'rocketchat.settings.auto_create_users', default: 'Fehlende Benutzer automatisch in Rocket.Chat anlegen') %>
-  <%= hidden_field_tag 'settings[auto_create_users]', 'false' %>
-  <%= check_box_tag 'settings[auto_create_users]', 'true', Setting.plugin_redmine_subrocketchat['auto_create_users'] != 'false' %>
-  <br>
-  <small><%= l(:'rocketchat.settings.auto_create_users_hint', default: 'Legt Redmine-Benutzer bei Bedarf automatisch in Rocket.Chat an (mit Benutzername, Name und E-Mail).') %></small>
-</p>
+  <!-- STEP 2: 1-CLICK REDMINE ROLES & PROJECT ACTIVATION -->
+  <div class="rc-admin-card">
+    <h4>
+      <span>2. <%= l(:'rocketchat.settings.step2_title', default: 'Redmine Roles & Project Channels') %></span>
+    </h4>
 
-<p>
-  <%= label_tag 'settings[auto_create_issue_threads]', l(:'rocketchat.settings.auto_create_issue_threads', default: 'Ticket-Threads automatisch bei neuen Tickets starten') %>
-  <%= hidden_field_tag 'settings[auto_create_issue_threads]', 'false' %>
-  <%= check_box_tag 'settings[auto_create_issue_threads]', 'true', Setting.plugin_redmine_subrocketchat['auto_create_issue_threads'] == 'true' %>
-  <br>
-  <small><%= l(:'rocketchat.settings.auto_create_issue_threads_hint', default: 'Erstellt für jedes neue Ticket automatisch eine Start-Nachricht als Thread im Projekt-Kanal.') %></small>
-</p>
+    <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+      <%= l(:'rocketchat.settings.wizard.roles_label', default: 'Roles allowed to use Rocket.Chat (:access_chat):') %>
+    </div>
+    <div class="rc-admin-roles-grid">
+      <% non_builtin_roles.each do |role| %>
+        <label class="rc-admin-role-item">
+          <input type="checkbox" class="rc-role-checkbox" value="<%= role.id %>" <%= 'checked' if role.allowed_to?(:access_chat) %>>
+          <%= role.name %>
+        </label>
+      <% end %>
+    </div>
 
-<p>
-  <%= label_tag 'settings[post_issue_updates_to_thread]', l(:'rocketchat.settings.post_issue_updates_to_thread', default: 'Ticket-Updates & Kommentare in den Ticket-Thread posten') %>
-  <%= hidden_field_tag 'settings[post_issue_updates_to_thread]', 'false' %>
-  <%= check_box_tag 'settings[post_issue_updates_to_thread]', 'true', Setting.plugin_redmine_subrocketchat['post_issue_updates_to_thread'] != 'false' %>
-  <br>
-  <small><%= l(:'rocketchat.settings.post_issue_updates_to_thread_hint', default: 'Wenn ein Ticket einen aktiven Thread hat, werden Statusänderungen und Notizen automatisch als Antwort in diesen Thread gepostet.') %></small>
-</p>
+    <div style="display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px 0;">
+      <label class="rc-admin-role-item">
+        <input type="checkbox" id="rc-chk-default-mod" <%= 'checked' if default_mod_enabled %>>
+        <%= l(:'rocketchat.settings.wizard.enable_default_mod', default: 'Enable Rocket.Chat automatically for newly created projects') %>
+      </label>
+      <label class="rc-admin-role-item">
+        <input type="checkbox" id="rc-chk-sync-active" checked>
+        <%= l(:'rocketchat.settings.wizard.sync_active_projects', default: 'Synchronize Rocket.Chat channels & members for all projects where the Rocket.Chat module is active') %>
+      </label>
+      <label class="rc-admin-role-item">
+        <input type="checkbox" id="rc-chk-enable-all">
+        <%= l(:'rocketchat.settings.wizard.enable_all_projects', default: 'Also activate the Rocket.Chat module on ALL existing active projects now') %>
+      </label>
+    </div>
 
-<hr>
-<h4><%= l(:'rocketchat.settings.instructions') %></h4>
-<b><%= l(:'rocketchat.settings.prepare_server') %></b>
-<ol>
-  <li>
-    <%= l(:'rocketchat.settings.api_account') %>
-    <ul>
-      <li>
-        <%= l(:'rocketchat.settings.create_bot') %>
-        <table style="font-size: smaller; line-height: 1.2em; border: solid 1pt #0000002b; background: white; margin: 1em; padding: 1em;">
-          <thead>
-            <tr>
-              <th><%= l(:'rocketchat.settings.permission_key') %></th>
-              <th><%= l(:'rocketchat.settings.permission_value') %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>api-bypass-rate-limit</td>
-              <td><%= l(:'rocketchat.settings.api_bypass_hint') %></td>
-            </tr>
-            <tr>
-              <td>create-p / delete-p</td>
-              <td><%= l(:'rocketchat.settings.create_p_hint') %></td>
-            </tr>
-            <tr>
-              <td>add-user-to-any-p-room / remove-user</td>
-              <td><%= l(:'rocketchat.settings.add_user_hint') %></td>
-            </tr>
-            <tr>
-              <td>create-user / create-user-token</td>
-              <td><%= l(:'rocketchat.settings.create_user_token_hint', default: 'Für automatisches Anlegen von Benutzern und SSO Auto-Login in EmbeddedChat.') %></td>
-            </tr>
-            <tr>
-              <td>create-personal-access-tokens</td>
-              <td><%= l(:'rocketchat.settings.create_tokens_hint') %></td>
-            </tr>
-            <tr>
-              <td>send-many-messages</td>
-              <td><%= l(:'rocketchat.settings.send_messages_hint') %></td>
-            </tr>
-          </tbody>
-        </table>
-      </li>
-      <li><%= l(:'rocketchat.settings.token_creation') %></li>
-    </ul>
-  </li>
-  <li>
-    <%= l(:'rocketchat.settings.allow_cors', default: 'CORS für EmbeddedChat in Rocket.Chat aktivieren:') %>
-    <ul>
-      <li><%= l(:'rocketchat.settings.enable_cors_hint', default: 'Unter Administration -> Workspace -> Einstellungen -> Allgemein -> REST API die Option "Enable CORS" aktivieren und die Redmine-URL eintragen (oder *).') %></li>
-    </ul>
-  </li>
-</ol>
-<br>
-<b><%= l(:'rocketchat.settings.permissions') %></b>
-<ul>
-  <li><%= l(:'rocketchat.settings.role_permissions') %> (<a href="/roles"><%= l(:'rocketchat.settings.enable_iframe_roles') %></a>)</li>
-  <li><%= l(:'rocketchat.settings.default_module') %></li>
-</ul>
+    <button type="button" id="rc-btn-quick-setup" class="rc-admin-btn is-primary">
+      ✔ <%= l(:'rocketchat.settings.wizard.apply_setup_btn', default: 'Apply Roles & Synchronize Projects Now') %>
+    </button>
+    <div id="rc-quick-setup-status" class="rc-admin-status"></div>
+  </div>
+
+  <!-- STEP 3: CHAT BEHAVIOR, SSO & TICKET THREADS -->
+  <div class="rc-admin-card">
+    <h4>
+      <span>3. <%= l(:'rocketchat.settings.features_title', default: 'Sidebar, SSO & Ticket Threads') %></span>
+    </h4>
+
+    <p>
+      <%= label_tag 'settings[show_sidebar]', l(:'rocketchat.settings.show_sidebar') %>
+      <%= hidden_field_tag 'settings[show_sidebar]', 'false' %>
+      <%= check_box_tag 'settings[show_sidebar]', 'true', s['show_sidebar'] != 'false' %>
+      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.show_sidebar_hint') %></span>
+    </p>
+
+    <p>
+      <%= label_tag 'settings[auto_create_users]', l(:'rocketchat.settings.auto_create_users') %>
+      <%= hidden_field_tag 'settings[auto_create_users]', 'false' %>
+      <%= check_box_tag 'settings[auto_create_users]', 'true', s['auto_create_users'] != 'false' %>
+      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_users_hint') %></span>
+    </p>
+
+    <p>
+      <%= label_tag 'settings[auto_create_issue_threads]', l(:'rocketchat.settings.auto_create_issue_threads') %>
+      <%= hidden_field_tag 'settings[auto_create_issue_threads]', 'false' %>
+      <%= check_box_tag 'settings[auto_create_issue_threads]', 'true', s['auto_create_issue_threads'] == 'true' %>
+      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_issue_threads_hint') %></span>
+    </p>
+
+    <p>
+      <%= label_tag 'settings[post_issue_updates_to_thread]', l(:'rocketchat.settings.post_issue_updates_to_thread') %>
+      <%= hidden_field_tag 'settings[post_issue_updates_to_thread]', 'false' %>
+      <%= check_box_tag 'settings[post_issue_updates_to_thread]', 'true', s['post_issue_updates_to_thread'] != 'false' %>
+      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.post_issue_updates_to_thread_hint') %></span>
+    </p>
+
+    <details class="rc-admin-details">
+      <summary><%= l(:'rocketchat.settings.sso_advanced_toggle', default: 'Optional: Silent Token SSO (CREATE_TOKENS_FOR_USERS_SECRET)') %></summary>
+      <div style="margin-top: 10px;">
+        <p>
+          <%= label_tag 'settings[auto_login_users]', l(:'rocketchat.settings.auto_login_users') %>
+          <%= hidden_field_tag 'settings[auto_login_users]', 'false' %>
+          <%= check_box_tag 'settings[auto_login_users]', 'true', s['auto_login_users'] != 'false' %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_login_users_hint') %></span>
+        </p>
+
+        <p>
+          <%= label_tag 'settings[rocket_chat_token_secret]', l(:'rocketchat.settings.rocket_chat_token_secret') %>
+          <%= password_field_tag 'settings[rocket_chat_token_secret]', s['rocket_chat_token_secret'], size: 45 %>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_token_secret_hint') %></span>
+        </p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+(function() {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const urlInput = document.getElementById('rc-input-url');
+  const urlInternalInput = document.getElementById('rc-input-url-internal');
+  const userIdInput = document.getElementById('rc-input-user-id');
+  const tokenInput = document.getElementById('rc-input-token');
+  const badgeEl = document.getElementById('rc-connection-badge');
+  const wizardStatus = document.getElementById('rc-wizard-status');
+  const connectBtn = document.getElementById('rc-btn-connect');
+  const testBtn = document.getElementById('rc-btn-test');
+  const quickSetupBtn = document.getElementById('rc-btn-quick-setup');
+  const quickSetupStatus = document.getElementById('rc-quick-setup-status');
+
+  function showStatus(el, ok, msg) {
+    el.className = 'rc-admin-status ' + (ok ? 'is-ok' : 'is-err');
+    el.textContent = msg;
+  }
+
+  async function callAdminSetup(payload) {
+    const res = await fetch('/rocket_chat/admin_setup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        rocket_chat_url: urlInput?.value || '',
+        rocket_chat_url_internal: urlInternalInput?.value || '',
+        ...payload
+      })
+    });
+    return res.json();
+  }
+
+  if (connectBtn) {
+    connectBtn.addEventListener('click', async () => {
+      const username = document.getElementById('rc-wizard-username')?.value || '';
+      const passwordInput = document.getElementById('rc-wizard-password');
+      const password = passwordInput?.value || '';
+
+      connectBtn.disabled = true;
+      try {
+        const data = await callAdminSetup({
+          operation: 'connect_login',
+          username: username,
+          password: password
+        });
+        if (data.success) {
+          if (userIdInput) userIdInput.value = data.user_id;
+          if (tokenInput) tokenInput.value = data.token;
+          if (passwordInput) passwordInput.value = '';
+          const typeLabel = data.token_type === 'personal_access_token'
+            ? 'Personal Access Token (non-expiring)'
+            : 'Auth Token';
+          showStatus(
+            wizardStatus,
+            true,
+            `✔ Connected as @${data.username} (Roles: ${(data.roles || []).join(', ') || 'user'}) — ${typeLabel} generated & saved!`
+          );
+          if (badgeEl) {
+            badgeEl.className = 'rc-admin-badge is-ok';
+            badgeEl.textContent = `✔ Connected (@${data.username})`;
+          }
+        } else {
+          showStatus(wizardStatus, false, `✖ ${data.error || 'Connection failed'}`);
+        }
+      } catch (e) {
+        showStatus(wizardStatus, false, `✖ ${e.message}`);
+      } finally {
+        connectBtn.disabled = false;
+      }
+    });
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      testBtn.disabled = true;
+      try {
+        const data = await callAdminSetup({
+          operation: 'test_connection',
+          rocket_chat_user_id: userIdInput?.value || '',
+          rocket_chat_token: tokenInput?.value || ''
+        });
+        if (data.success) {
+          showStatus(
+            wizardStatus,
+            true,
+            `✔ Connection OK — Logged in as @${data.username} (${data.name}) · Roles: ${(data.roles || []).join(', ')} · Rocket.Chat ${data.rc_version}`
+          );
+          if (badgeEl) {
+            badgeEl.className = 'rc-admin-badge is-ok';
+            badgeEl.textContent = `✔ Connected (@${data.username})`;
+          }
+        } else {
+          showStatus(wizardStatus, false, `✖ ${data.error || 'Connection test failed'}`);
+          if (badgeEl) {
+            badgeEl.className = 'rc-admin-badge is-err';
+            badgeEl.textContent = '✖ Connection error';
+          }
+        }
+      } catch (e) {
+        showStatus(wizardStatus, false, `✖ ${e.message}`);
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+  }
+
+  if (quickSetupBtn) {
+    quickSetupBtn.addEventListener('click', async () => {
+      quickSetupBtn.disabled = true;
+      const roleIds = Array.from(document.querySelectorAll('.rc-role-checkbox:checked')).map((cb) => cb.value);
+      const enableDefaultMod = document.getElementById('rc-chk-default-mod')?.checked || false;
+      const syncActive = document.getElementById('rc-chk-sync-active')?.checked || false;
+      const enableAll = document.getElementById('rc-chk-enable-all')?.checked || false;
+
+      try {
+        const data = await callAdminSetup({
+          operation: 'apply_quick_setup',
+          role_ids: roleIds,
+          enable_default_module: enableDefaultMod,
+          sync_active_projects: syncActive,
+          enable_all_projects: enableAll
+        });
+        if (data.success) {
+          showStatus(
+            quickSetupStatus,
+            true,
+            `✔ Updated permissions for ${data.roles_updated} role(s) and synchronized ${data.synced_projects} project channel(s) in Rocket.Chat!`
+          );
+        } else {
+          showStatus(quickSetupStatus, false, `✖ ${data.error || 'Quick setup failed'}`);
+        }
+      } catch (e) {
+        showStatus(quickSetupStatus, false, `✖ ${e.message}`);
+      } finally {
+        quickSetupBtn.disabled = false;
+      }
+    });
+  }
+})();
+</script>

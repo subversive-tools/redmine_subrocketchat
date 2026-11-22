@@ -5,14 +5,18 @@
 ![Rocket.Chat](https://img.shields.io/badge/Rocket.Chat-6.x%20%7C%207.x%20%7C%208.x-F5455C.svg?logo=rocketchat)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-A modern Redmine plugin that embeds **Rocket.Chat** directly into Redmine project pages and issues via **[@embeddedchat/react](https://github.com/RocketChat/EmbeddedChat)** — replacing legacy `<iframe>` integrations with a native, theme-adaptive chat sidebar, automatic SSO token authentication, live `#1234` issue autocomplete, and dedicated per-issue chat threads.
+A modern Redmine plugin that embeds **Rocket.Chat** directly into Redmine project pages and issues via **[@embeddedchat/react](https://github.com/RocketChat/EmbeddedChat)** — replacing legacy `<iframe>` integrations with a native, theme-adaptive chat sidebar, a **1-Click Setup Wizard**, live `#1234` issue autocomplete, and dedicated per-issue chat threads.
 
-> Built for teams that want real-time Rocket.Chat collaboration tightly woven into their Redmine project and ticket workflow — without third-party cookie headaches, CORS hurdles, or iframe layout glitches.
+> Built for teams that want real-time Rocket.Chat collaboration tightly woven into their Redmine project and ticket workflow — without third-party cookie headaches, CORS configuration, or iframe layout glitches.
 
 ---
 
 ## Features
 
+- **1-Click Setup Wizard (Zero Rocket.Chat CORS / Iframe Config Needed)**:
+  - Because all REST and media requests run through the built-in Redmine same-origin proxy, **you do not need to configure CORS or iframe headers in Rocket.Chat**.
+  - Simply enter your **Rocket.Chat URL** plus the username & password of a Rocket.Chat `admin` / bot user in the plugin settings and click **Connect & Generate Token** — Redmine automatically generates and stores a non-expiring Personal Access Token and User ID.
+  - Enable role permissions (`:access_chat`), default project modules, and initial project channel synchronization with a single button click directly on the plugin settings page.
 - **Native EmbeddedChat Integration (No `<iframe>`)**:
   - Renders Rocket.Chat directly inside the Redmine DOM using a pre-bundled `@embeddedchat/react` client (`assets/javascripts/rocketchat_embedded.js`).
   - Eliminates third-party cookie restrictions, `X-Frame-Options` / CSP blocks, and double scrollbars.
@@ -37,88 +41,46 @@ A modern Redmine plugin that embeds **Rocket.Chat** directly into Redmine projec
   - **Optional automatic thread creation** whenever a new issue is created.
   - **Optional automatic journal updates**: posts issue status/assignee/priority changes and notes as replies into the issue's active Rocket.Chat thread.
 - **Automatic Channel, Member & User Synchronization**:
-  - Automatically creates a private Rocket.Chat group (`groups.create`) when a Redmine project with the `rocket_chat` module is created, and archives/deletes it when the project is archived/deleted.
-  - Automatically syncs project member additions, role permissions (`:access_rocket_chat`), and removals to the corresponding Rocket.Chat group.
-  - **Auto-Provisioning & Token SSO**: optionally creates missing Redmine users in Rocket.Chat on the fly (`users.create`) and logs them into EmbeddedChat automatically via `users.createToken` (supports Rocket.Chat 7.x / 8.x `CREATE_TOKENS_FOR_USERS_SECRET`).
+  - Automatically creates a private Rocket.Chat group (`rm_<project_identifier>`) when a Redmine project with the `rocket_chat` module is created, and deletes it when the project is deleted.
+  - Automatically syncs project member additions and removals to the corresponding Rocket.Chat group.
+  - **Auto-Provisioning**: automatically creates missing Redmine users in Rocket.Chat on the fly (`users.create`).
 - **Built-in Rocket.Chat 8.x Compatibility & Same-Origin Proxy**:
-  - Routes `/api/*`, `/file-upload/*`, and `/ufs/*` requests through Redmine's authenticated `RocketChatController#proxy`, avoiding browser CORS preflight (`OPTIONS 405`) and media authentication issues.
+  - Routes `/api/*`, `/file-upload/*`, and `/ufs/*` requests through Redmine's authenticated `RocketChatController#proxy`.
   - Transparently translates public channel endpoints (`channels.*`) used by EmbeddedChat to private group endpoints (`groups.*`).
   - Translates legacy `rooms.upload/:rid` calls (removed in Rocket.Chat 8.0) into Rocket.Chat 8.x's two-step `rooms.media` + `rooms.mediaConfirm` upload workflow.
   - Translates thread message queries (`query={"tmid":...}`) to `/api/v1/chat.getThreadMessages` for Rocket.Chat 7.x / 8.x compatibility.
-- **Redmine Subsimplify Integration**:
-  - Automatically respects [`redmine_subsimplify`](https://github.com/subversive-tools/redmine_subsimplify) module visibility settings when installed.
 
 ---
 
 ## Requirements
 
-- **Redmine**: `4.x`, `5.x`, `6.x`, or `7.x` (Ruby `2.7+` / `3.x`)
+- **Redmine**: `4.x`, `5.x`, `6.x`, or `7.x`
 - **Rocket.Chat**: `6.x`, `7.x`, or `8.x`
-  - **WebSockets** must be reachable from the user's browser at the public Rocket.Chat URL (`wss://...`).
-  - If using **Rocket.Chat 7.x / 8.x** with SSO auto-login (`users.createToken`), ensure the environment variable `CREATE_TOKENS_FOR_USERS_SECRET` is set on your Rocket.Chat server and configured in the plugin settings.
-
-### Required Rocket.Chat Bot / Admin Permissions
-
-Create a dedicated service/bot account in Rocket.Chat (e.g. `redmine_bot`) or use an admin account with a **Personal Access Token** and the following permissions:
-
-| Permission Key | Purpose |
-|:---|:---|
-| `create-p` | Create private groups for Redmine projects |
-| `delete-p` | Delete private groups when projects are removed (or archived if configured) |
-| `add-user-to-any-p-room` | Add project members to private project groups |
-| `remove-user` | Remove project members from private project groups |
-| `view-p-room` | Query private group info, messages, and files |
-| `create-personal-access-tokens` | Generate the API Token for the bot user |
-| `api-bypass-rate-limit` | Avoid rate-limiting during bulk member or project synchronization |
-| `create-user` *(optional)* | Required if **Automatically provision missing users in Rocket.Chat** is enabled |
-| `create-user-token` *(optional)* | Required if **Automatic login (SSO via token) in EmbeddedChat** is enabled |
+- A dedicated bot/service user in Rocket.Chat (e.g. `redmine_bot`) with the **`admin`** role.
 
 ---
 
-## Installation
+## Quick Installation & 1-Click Setup
 
 > [!IMPORTANT]
 > The plugin directory **MUST** be named `redmine_subrocketchat`.
-> *(Upgrading from legacy `redmine_rocketchat`? The plugin automatically migrates your existing configuration from `plugin_redmine_rocketchat` on startup.)*
+> *(Upgrading from legacy `redmine_rocketchat`? Your existing configuration is migrated automatically on startup.)*
 
-1. **Clone** the repository into your Redmine `plugins/` directory:
+1. **Clone & Migrate**:
    ```bash
    cd /path/to/redmine/plugins
    git clone https://github.com/subversive-tools/redmine_subrocketchat.git redmine_subrocketchat
-   ```
 
-2. **Run the plugin database migration** (adds `rocketchat_thread_id` to `issues`):
-   ```bash
    cd /path/to/redmine
    bundle exec rake redmine:plugins:migrate RAILS_ENV=production
    ```
 
-3. **Restart Redmine** (e.g. `touch tmp/restart.txt`, restart Puma/Unicorn/Passenger, or restart your Docker container).
+2. **Restart Redmine**.
 
-4. **Configure the plugin** in Redmine:
-   - Go to **Administration > Plugins > Redmine Subrocketchat Plugin > Configure** and enter your Rocket.Chat connection details.
-   - Go to **Administration > Roles and permissions** and grant the **Access rocket chat** permission (under the *Rocket.Chat* section) to the appropriate roles.
-   - Enable the **Rocket.Chat** module in your projects under **Project > Settings > Modules** (or enable it globally as a default project module under **Administration > Settings > Projects**).
-
----
-
-## Configuration
-
-Navigate to **Administration > Plugins > Redmine Subrocketchat Plugin > Configure**:
-
-| Setting | Description | Default |
-|:---|:---|:---|
-| **Redmine Base URL** | Public base URL of your Redmine instance (used for backlinks in Rocket.Chat thread root messages). Defaults to Redmine's `protocol://host_name`. | Auto-detected |
-| **Rocket.Chat URL** | Public URL of your Rocket.Chat server (used by the browser for WebSocket connections and "Open in Rocket.Chat" links, e.g. `https://chat.example.com`). | `https://chat.example.com` |
-| **Optional internal Rocket.Chat address** | Optional internal backend URL for server-to-server REST API & proxy calls (e.g. `http://rocketchat:3000` in Docker setups). Falls back to **Rocket.Chat URL** if empty. | *(empty)* |
-| **Rocket.Chat User ID** | User ID of the Rocket.Chat bot/admin account. | *(empty)* |
-| **Rocket.Chat API Token** | Personal Access Token of the Rocket.Chat bot/admin account. | *(empty)* |
-| **Rocket.Chat Token Secret (`CREATE_TOKENS_FOR_USERS_SECRET`)** | Optional secret required by Rocket.Chat 7.x / 8.x for `/api/v1/users.createToken` SSO token generation. | *(empty)* |
-| **Show Rocket.Chat in Sidebar** | Renders Rocket.Chat as a persistent, collapsible, resizable sidebar across all project pages. If disabled, Rocket.Chat is only shown under the project's **Chat** tab. | Enabled (`1`) |
-| **Automatic login (SSO via token) in EmbeddedChat** | Automatically generates a Rocket.Chat resume token for the current Redmine user so they are signed into EmbeddedChat immediately. | Enabled (`1`) |
-| **Automatically provision missing users in Rocket.Chat** | Creates a matching Rocket.Chat user account (username, full name, email) automatically if the Redmine user does not exist in Rocket.Chat yet. | Enabled (`1`) |
-| **Automatically create ticket threads for new issues** | Automatically posts a root message in the project's Rocket.Chat group and links the thread whenever a new issue is created. | Disabled (`0`) |
-| **Post issue updates & notes to the ticket thread** | When an issue has an active Rocket.Chat thread, posts status/priority/assignee changes and notes as replies into that thread. | Enabled (`1`) |
+3. **1-Click Setup in Redmine** (**Administration > Plugins > Subrocketchat > Configure**):
+   - **Step 1**: Enter your **Rocket.Chat URL** (`https://chat.example.com`) and the username & password of your Rocket.Chat admin/bot user (`redmine_bot`), then click **⚡ Connect & Generate Token**.
+   - **Step 2**: Check the Redmine roles that should have chat access and click **✔ Apply Roles & Synchronize Projects Now**.
+   - Done!
 
 ---
 
@@ -146,15 +108,13 @@ Navigate to **Administration > Plugins > Redmine Subrocketchat Plugin > Configur
 
 The plugin ships with a pre-built production bundle at [`assets/javascripts/rocketchat_embedded.js`](assets/javascripts/rocketchat_embedded.js), so **no Node.js installation is required on your Redmine server**.
 
-If you want to modify [`frontend/rocketchat_embedded.jsx`](frontend/rocketchat_embedded.jsx) or update the EmbeddedChat patches:
+If you want to modify [`frontend/rocketchat_embedded.jsx`](frontend/rocketchat_embedded.jsx):
 
 ```bash
 cd frontend
 npm install
 npm run build
 ```
-
-This runs [`frontend/build.mjs`](frontend/build.mjs), which applies the Redmine integration patches to `@embeddedchat/react` and bundles the code into `assets/javascripts/rocketchat_embedded.js` via `esbuild`.
 
 ---
 
@@ -165,12 +125,6 @@ This runs [`frontend/build.mjs`](frontend/build.mjs), which applies the Redmine 
 ## Contributing
 
 Contributions are welcome — please fork the repository and open a Pull Request.
-
-1. Fork it
-2. Create your feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
 
 ## License
 
