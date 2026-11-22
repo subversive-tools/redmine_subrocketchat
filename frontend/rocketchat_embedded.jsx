@@ -64,6 +64,18 @@ function buildRedmineAdaptiveTheme() {
   const fontSizePx = parseInt(bodyStyle.fontSize, 10) || 13;
 
   const isTransparent = (c) => !c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)';
+  const isTooLight = (c) => {
+    if (!c) return true;
+    const m = String(c).match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (m) {
+      const r = Number(m[1]);
+      const g = Number(m[2]);
+      const b = Number(m[3]);
+      // Perceived luminance > 215 means white text (#ffffff) would be unreadable/invisible
+      return (0.299 * r + 0.587 * g + 0.114 * b) > 215;
+    }
+    return /^#(?:fff|ffffff|f[8-9a-f].*)$/i.test(String(c).trim());
+  };
 
   const bg = !isTransparent(contentStyle.backgroundColor)
     ? contentStyle.backgroundColor
@@ -73,12 +85,27 @@ function buildRedmineAdaptiveTheme() {
 
   const fg = contentStyle.color || bodyStyle.color || '#212136';
 
+  const headerEl = document.getElementById('header');
   let primary = '#3E5B76';
-  if (selectedTabEl && !isTransparent(window.getComputedStyle(selectedTabEl).backgroundColor)) {
+  if (
+    selectedTabEl &&
+    !isTransparent(window.getComputedStyle(selectedTabEl).backgroundColor) &&
+    !isTooLight(window.getComputedStyle(selectedTabEl).backgroundColor)
+  ) {
     primary = window.getComputedStyle(selectedTabEl).backgroundColor;
-  } else if (topMenuEl && !isTransparent(window.getComputedStyle(topMenuEl).backgroundColor)) {
+  } else if (
+    topMenuEl &&
+    !isTransparent(window.getComputedStyle(topMenuEl).backgroundColor) &&
+    !isTooLight(window.getComputedStyle(topMenuEl).backgroundColor)
+  ) {
     primary = window.getComputedStyle(topMenuEl).backgroundColor;
-  } else if (linkEl && window.getComputedStyle(linkEl).color) {
+  } else if (
+    headerEl &&
+    !isTransparent(window.getComputedStyle(headerEl).backgroundColor) &&
+    !isTooLight(window.getComputedStyle(headerEl).backgroundColor)
+  ) {
+    primary = window.getComputedStyle(headerEl).backgroundColor;
+  } else if (linkEl && window.getComputedStyle(linkEl).color && !isTooLight(window.getComputedStyle(linkEl).color)) {
     primary = window.getComputedStyle(linkEl).color;
   }
 
