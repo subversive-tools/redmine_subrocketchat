@@ -117,7 +117,7 @@ class RocketChatController < ApplicationController
     when 'apply_quick_setup'
       # 1. Grant :access_chat permission to selected role IDs (or all non-builtin roles)
       role_ids = Array(params[:role_ids]).map(&:to_i).reject(&:zero?)
-      Role.where(builtin: 0).find_each do |role|
+      Role.givable.find_each do |role|
         if role_ids.include?(role.id)
           role.add_permission!(:access_chat) unless role.allowed_to?(:access_chat)
         else

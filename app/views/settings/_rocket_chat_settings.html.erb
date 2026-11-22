@@ -2,12 +2,34 @@
 <%
   s = Setting.plugin_redmine_subrocketchat || {}
   has_credentials = s['rocket_chat_user_id'].present? && s['rocket_chat_token'].present?
-  non_builtin_roles = Role.where(builtin: 0).sorted
+  non_builtin_roles = Role.givable.sorted
   default_mod_enabled = Array(Setting.default_projects_modules).map(&:to_s).include?('rocket_chat')
 %>
 
 <style>
-  .rc-admin-wrap { max-width: 880px; font-size: 13px; line-height: 1.5; }
+  /* Reset Redmine's `.tabular label { float: left; width: 175px; margin-left: -180px; text-align: right; }` inside our cards */
+  .rc-admin-wrap {
+    max-width: 900px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+  .rc-admin-wrap p,
+  .rc-admin-wrap div.rc-form-row {
+    margin: 0 0 12px 0 !important;
+    padding: 0 !important;
+    clear: both;
+  }
+  .rc-admin-wrap label {
+    float: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    font-weight: 600;
+    color: #1f2937;
+  }
   .rc-admin-card {
     background: #ffffff;
     border: 1px solid #d8dee4;
@@ -17,7 +39,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.03);
   }
   .rc-admin-card h4 {
-    margin: 0 0 10px 0;
+    margin: 0 0 12px 0 !important;
     font-size: 14px;
     color: #1f2937;
     display: flex;
@@ -42,7 +64,7 @@
     background: #f8fafc;
     border: 1px dashed #cbd5e1;
     border-radius: 6px;
-    padding: 12px 16px;
+    padding: 14px 16px;
     margin: 12px 0;
   }
   .rc-admin-wizard-row {
@@ -50,23 +72,26 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 10px;
-    margin-top: 8px;
+    margin-top: 10px;
   }
-  .rc-admin-field { display: flex; flex-direction: column; gap: 3px; }
+  .rc-admin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
   .rc-admin-field label {
-    font-weight: 600;
-    font-size: 12px;
-    color: #374151;
-    margin: 0 !important;
-    width: auto !important;
-    float: none !important;
-    text-align: left !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    color: #374151 !important;
+    display: block !important;
   }
-  .rc-admin-field input[type="text"],
-  .rc-admin-field input[type="password"] {
+  .rc-admin-wrap input[type="text"],
+  .rc-admin-wrap input[type="password"] {
     padding: 5px 8px;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .rc-admin-btn {
     display: inline-flex;
@@ -81,6 +106,8 @@
     font-size: 12.5px;
     cursor: pointer;
     transition: all 0.15s ease;
+    height: 31px;
+    box-sizing: border-box;
   }
   .rc-admin-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
   .rc-admin-btn.is-primary {
@@ -100,9 +127,9 @@
   .rc-admin-status.is-ok { display: block; background: #dcfce7; color: #166534; border: 1px solid #86efac; }
   .rc-admin-status.is-err { display: block; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
   .rc-admin-details {
-    margin-top: 10px;
+    margin-top: 12px;
     border-top: 1px solid #eef1f4;
-    padding-top: 8px;
+    padding-top: 10px;
   }
   .rc-admin-details summary {
     cursor: pointer;
@@ -115,16 +142,37 @@
   .rc-admin-roles-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 18px;
-    margin: 8px 0 12px 0;
+    gap: 8px 16px;
+    margin: 8px 0 14px 0;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
   }
-  .rc-admin-role-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 500;
+  label.rc-admin-check-row {
+    display: flex !important;
+    align-items: flex-start;
+    gap: 8px;
+    font-weight: 500 !important;
+    cursor: pointer;
+    color: #1f2937;
+    line-height: 1.4;
   }
-  .rc-admin-hint { color: #64748b; font-size: 12px; margin-top: 2px; display: block; }
+  label.rc-admin-check-row input[type="checkbox"] {
+    margin: 2px 0 0 0 !important;
+    flex-shrink: 0;
+  }
+  .rc-admin-check-title {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .rc-admin-hint {
+    color: #64748b;
+    font-size: 12px;
+    margin-top: 3px;
+    display: block;
+    font-weight: 400;
+  }
 </style>
 
 <div class="rc-admin-wrap">
@@ -137,11 +185,13 @@
       </span>
     </h4>
 
-    <p style="margin: 0 0 10px 0;">
-      <%= label_tag 'settings[rocket_chat_url]', l(:'rocketchat.settings.rocket_chat_url', default: 'Rocket.Chat URL') %>
-      <%= text_field_tag 'settings[rocket_chat_url]', s['rocket_chat_url'], size: 55, id: 'rc-input-url', placeholder: 'https://chat.example.com' %>
+    <div class="rc-form-row">
+      <div class="rc-admin-field">
+        <%= label_tag 'settings[rocket_chat_url]', l(:'rocketchat.settings.rocket_chat_url', default: 'Rocket.Chat URL') %>
+        <%= text_field_tag 'settings[rocket_chat_url]', s['rocket_chat_url'], size: 55, id: 'rc-input-url', placeholder: 'https://chat.example.com', style: 'max-width: 460px;' %>
+      </div>
       <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_url_hint', default: 'Public URL of your Rocket.Chat instance (e.g. https://chat.example.com)') %></span>
-    </p>
+    </div>
 
     <!-- 1-Click Login & Token Generator -->
     <div class="rc-admin-wizard">
@@ -175,30 +225,30 @@
     <!-- Collapsible Manual Token & Advanced Server Settings -->
     <details class="rc-admin-details" <%= 'open' unless has_credentials %>>
       <summary><%= l(:'rocketchat.settings.manual_toggle', default: 'Manual Token Entry & Advanced Server URLs (optional)') %></summary>
-      <div style="margin-top: 10px;">
-        <p>
+      <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <div class="rc-admin-field">
           <%= label_tag 'settings[rocket_chat_user_id]', l(:'rocketchat.settings.rocket_chat_user_id', default: 'Rocket.Chat User ID') %>
-          <%= text_field_tag 'settings[rocket_chat_user_id]', s['rocket_chat_user_id'], size: 45, id: 'rc-input-user-id' %>
+          <%= text_field_tag 'settings[rocket_chat_user_id]', s['rocket_chat_user_id'], size: 45, id: 'rc-input-user-id', style: 'max-width: 380px;' %>
           <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_user_id_hint') %></span>
-        </p>
+        </div>
 
-        <p>
+        <div class="rc-admin-field">
           <%= label_tag 'settings[rocket_chat_token]', l(:'rocketchat.settings.rocket_chat_token', default: 'Rocket.Chat API Token') %>
-          <%= password_field_tag 'settings[rocket_chat_token]', s['rocket_chat_token'], size: 45, id: 'rc-input-token' %>
+          <%= password_field_tag 'settings[rocket_chat_token]', s['rocket_chat_token'], size: 45, id: 'rc-input-token', style: 'max-width: 380px;' %>
           <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_token_hint') %></span>
-        </p>
+        </div>
 
-        <p>
+        <div class="rc-admin-field">
           <%= label_tag 'settings[rocket_chat_url_internal]', l(:'rocketchat.settings.rocket_chat_url_internal', default: 'Internal Rocket.Chat URL (optional)') %>
-          <%= text_field_tag 'settings[rocket_chat_url_internal]', s['rocket_chat_url_internal'], size: 45, id: 'rc-input-url-internal', placeholder: 'http://rocketchat:3000' %>
+          <%= text_field_tag 'settings[rocket_chat_url_internal]', s['rocket_chat_url_internal'], size: 45, id: 'rc-input-url-internal', placeholder: 'http://rocketchat:3000', style: 'max-width: 380px;' %>
           <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_url_internal_hint') %></span>
-        </p>
+        </div>
 
-        <p>
+        <div class="rc-admin-field">
           <%= label_tag 'settings[redmine_host_url]', l(:'rocketchat.settings.redmine_host_url', default: 'Redmine Base URL (optional override)') %>
-          <%= text_field_tag 'settings[redmine_host_url]', s['redmine_host_url'], size: 45, placeholder: RedmineSubrocketchat::RocketChatHelper.redmine_base_url %>
+          <%= text_field_tag 'settings[redmine_host_url]', s['redmine_host_url'], size: 45, placeholder: RedmineSubrocketchat::RocketChatHelper.redmine_base_url, style: 'max-width: 380px;' %>
           <span class="rc-admin-hint"><%= l(:'rocketchat.settings.redmine_host_url_hint') %></span>
-        </p>
+        </div>
       </div>
     </details>
   </div>
@@ -210,29 +260,29 @@
     </h4>
 
     <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
-      <%= l(:'rocketchat.settings.wizard.roles_label', default: 'Roles allowed to use Rocket.Chat (:access_chat):') %>
+      <%= l(:'rocketchat.settings.wizard.roles_label', default: 'Redmine roles allowed to use Rocket.Chat (:access_chat):') %>
     </div>
     <div class="rc-admin-roles-grid">
       <% non_builtin_roles.each do |role| %>
-        <label class="rc-admin-role-item">
+        <label class="rc-admin-check-row">
           <input type="checkbox" class="rc-role-checkbox" value="<%= role.id %>" <%= 'checked' if role.allowed_to?(:access_chat) %>>
-          <%= role.name %>
+          <span><%= role.name %></span>
         </label>
       <% end %>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px 0;">
-      <label class="rc-admin-role-item">
+    <div style="display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px 0;">
+      <label class="rc-admin-check-row">
         <input type="checkbox" id="rc-chk-default-mod" <%= 'checked' if default_mod_enabled %>>
-        <%= l(:'rocketchat.settings.wizard.enable_default_mod', default: 'Enable Rocket.Chat automatically for newly created projects') %>
+        <span><%= l(:'rocketchat.settings.wizard.enable_default_mod', default: 'Enable Rocket.Chat automatically for newly created projects') %></span>
       </label>
-      <label class="rc-admin-role-item">
+      <label class="rc-admin-check-row">
         <input type="checkbox" id="rc-chk-sync-active" checked>
-        <%= l(:'rocketchat.settings.wizard.sync_active_projects', default: 'Synchronize Rocket.Chat channels & members for all projects where the Rocket.Chat module is active') %>
+        <span><%= l(:'rocketchat.settings.wizard.sync_active_projects', default: 'Synchronize Rocket.Chat channels & members for all projects where the Rocket.Chat module is active') %></span>
       </label>
-      <label class="rc-admin-role-item">
+      <label class="rc-admin-check-row">
         <input type="checkbox" id="rc-chk-enable-all">
-        <%= l(:'rocketchat.settings.wizard.enable_all_projects', default: 'Also activate the Rocket.Chat module on ALL existing active projects now') %>
+        <span><%= l(:'rocketchat.settings.wizard.enable_all_projects', default: 'Also activate the Rocket.Chat module on ALL existing active projects now') %></span>
       </label>
     </div>
 
@@ -245,52 +295,64 @@
   <!-- STEP 3: CHAT BEHAVIOR, SSO & TICKET THREADS -->
   <div class="rc-admin-card">
     <h4>
-      <span>3. <%= l(:'rocketchat.settings.features_title', default: 'Sidebar, SSO & Ticket Threads') %></span>
+      <span>3. <%= l(:'rocketchat.settings.features_title', default: 'Sidebar, User Provisioning & Ticket Threads') %></span>
     </h4>
 
-    <p>
-      <%= label_tag 'settings[show_sidebar]', l(:'rocketchat.settings.show_sidebar') %>
-      <%= hidden_field_tag 'settings[show_sidebar]', 'false' %>
-      <%= check_box_tag 'settings[show_sidebar]', 'true', s['show_sidebar'] != 'false' %>
-      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.show_sidebar_hint') %></span>
-    </p>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <label class="rc-admin-check-row">
+        <%= hidden_field_tag 'settings[show_sidebar]', 'false' %>
+        <%= check_box_tag 'settings[show_sidebar]', 'true', s['show_sidebar'] != 'false' %>
+        <div>
+          <span class="rc-admin-check-title"><%= l(:'rocketchat.settings.show_sidebar') %></span>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.show_sidebar_hint') %></span>
+        </div>
+      </label>
 
-    <p>
-      <%= label_tag 'settings[auto_create_users]', l(:'rocketchat.settings.auto_create_users') %>
-      <%= hidden_field_tag 'settings[auto_create_users]', 'false' %>
-      <%= check_box_tag 'settings[auto_create_users]', 'true', s['auto_create_users'] != 'false' %>
-      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_users_hint') %></span>
-    </p>
+      <label class="rc-admin-check-row">
+        <%= hidden_field_tag 'settings[auto_create_users]', 'false' %>
+        <%= check_box_tag 'settings[auto_create_users]', 'true', s['auto_create_users'] != 'false' %>
+        <div>
+          <span class="rc-admin-check-title"><%= l(:'rocketchat.settings.auto_create_users') %></span>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_users_hint') %></span>
+        </div>
+      </label>
 
-    <p>
-      <%= label_tag 'settings[auto_create_issue_threads]', l(:'rocketchat.settings.auto_create_issue_threads') %>
-      <%= hidden_field_tag 'settings[auto_create_issue_threads]', 'false' %>
-      <%= check_box_tag 'settings[auto_create_issue_threads]', 'true', s['auto_create_issue_threads'] == 'true' %>
-      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_issue_threads_hint') %></span>
-    </p>
+      <label class="rc-admin-check-row">
+        <%= hidden_field_tag 'settings[auto_create_issue_threads]', 'false' %>
+        <%= check_box_tag 'settings[auto_create_issue_threads]', 'true', s['auto_create_issue_threads'] == 'true' %>
+        <div>
+          <span class="rc-admin-check-title"><%= l(:'rocketchat.settings.auto_create_issue_threads') %></span>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_create_issue_threads_hint') %></span>
+        </div>
+      </label>
 
-    <p>
-      <%= label_tag 'settings[post_issue_updates_to_thread]', l(:'rocketchat.settings.post_issue_updates_to_thread') %>
-      <%= hidden_field_tag 'settings[post_issue_updates_to_thread]', 'false' %>
-      <%= check_box_tag 'settings[post_issue_updates_to_thread]', 'true', s['post_issue_updates_to_thread'] != 'false' %>
-      <span class="rc-admin-hint"><%= l(:'rocketchat.settings.post_issue_updates_to_thread_hint') %></span>
-    </p>
+      <label class="rc-admin-check-row">
+        <%= hidden_field_tag 'settings[post_issue_updates_to_thread]', 'false' %>
+        <%= check_box_tag 'settings[post_issue_updates_to_thread]', 'true', s['post_issue_updates_to_thread'] != 'false' %>
+        <div>
+          <span class="rc-admin-check-title"><%= l(:'rocketchat.settings.post_issue_updates_to_thread') %></span>
+          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.post_issue_updates_to_thread_hint') %></span>
+        </div>
+      </label>
+    </div>
 
     <details class="rc-admin-details">
       <summary><%= l(:'rocketchat.settings.sso_advanced_toggle', default: 'Optional: Silent Token SSO (CREATE_TOKENS_FOR_USERS_SECRET)') %></summary>
-      <div style="margin-top: 10px;">
-        <p>
-          <%= label_tag 'settings[auto_login_users]', l(:'rocketchat.settings.auto_login_users') %>
+      <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px;">
+        <label class="rc-admin-check-row">
           <%= hidden_field_tag 'settings[auto_login_users]', 'false' %>
           <%= check_box_tag 'settings[auto_login_users]', 'true', s['auto_login_users'] != 'false' %>
-          <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_login_users_hint') %></span>
-        </p>
+          <div>
+            <span class="rc-admin-check-title"><%= l(:'rocketchat.settings.auto_login_users') %></span>
+            <span class="rc-admin-hint"><%= l(:'rocketchat.settings.auto_login_users_hint') %></span>
+          </div>
+        </label>
 
-        <p>
+        <div class="rc-admin-field">
           <%= label_tag 'settings[rocket_chat_token_secret]', l(:'rocketchat.settings.rocket_chat_token_secret') %>
-          <%= password_field_tag 'settings[rocket_chat_token_secret]', s['rocket_chat_token_secret'], size: 45 %>
+          <%= password_field_tag 'settings[rocket_chat_token_secret]', s['rocket_chat_token_secret'], size: 45, style: 'max-width: 380px;' %>
           <span class="rc-admin-hint"><%= l(:'rocketchat.settings.rocket_chat_token_secret_hint') %></span>
-        </p>
+        </div>
       </div>
     </details>
   </div>
