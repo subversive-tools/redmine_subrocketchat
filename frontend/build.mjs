@@ -24,11 +24,32 @@ if (!fs.existsSync(ecIndexPath)) {
 
 let ecCode = fs.readFileSync(ecIndexPath, 'utf8');
 
-// 1. Export useMessageStore (Cg)
+// 1. Export useMessageStore (Cg), useUserStore (sg), useLoginStore (mg), and useTotpStore (dg)
 if (!ecCode.includes('Cg as useMessageStore')) {
   ecCode = ecCode.replace(
     'export{ws as EmbeddedChat,x as darkTheme,w as defaultTheme};',
-    'export{ws as EmbeddedChat,Cg as useMessageStore,x as darkTheme,w as defaultTheme};'
+    'export{ws as EmbeddedChat,Cg as useMessageStore,sg as useUserStore,mg as useLoginStore,dg as useTotpStore,x as darkTheme,w as defaultTheme};'
+  );
+} else if (!ecCode.includes('sg as useUserStore')) {
+  ecCode = ecCode.replace(
+    'export{ws as EmbeddedChat,Cg as useMessageStore,x as darkTheme,w as defaultTheme};',
+    'export{ws as EmbeddedChat,Cg as useMessageStore,sg as useUserStore,mg as useLoginStore,dg as useTotpStore,x as darkTheme,w as defaultTheme};'
+  );
+}
+
+// 5. Hide the bottom ChatInput bar ("Sign in to chat" + "JOIN") completely when not authenticated (`!oe`)
+if (!ecCode.includes('return!oe?null:d(Z,{className:"ec-chat-input "')) {
+  ecCode = ecCode.replace(
+    'return d(Z,{className:"ec-chat-input ".concat(I),style:l}',
+    'return!oe?null:d(Z,{className:"ec-chat-input ".concat(I),style:l}'
+  );
+}
+
+// 6. Automatically show the Login modal directly whenever the user is not authenticated and not in the TOTP step
+if (!ecCode.includes('!sg(function(e){return e.isUserAuthenticated})')) {
+  ecCode = ecCode.replace(
+    'X=mg((function(e){return e.isLoginModalOpen}))',
+    'X=mg((function(e){return e.isLoginModalOpen}))||(!sg(function(e){return e.isUserAuthenticated})&&!mg(function(e){return e.isLoginIn})&&!dg(function(e){return e.isTotpModalOpen}))'
   );
 }
 
