@@ -331,6 +331,11 @@ body button.ec-button.ec-button-square {
   border-color: var(--rc-theme-primary, #628DB6) !important;
 }
 
+.rc-EmbeddedMount .ec-chat-input textarea:disabled {
+  cursor: pointer !important;
+  pointer-events: none !important;
+}
+
 .rc-EmbeddedMount .ec-chat-input textarea,
 .rc-EmbeddedMount .ec-chat-input input {
   min-width: 0 !important;

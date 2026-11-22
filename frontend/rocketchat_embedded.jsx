@@ -872,6 +872,23 @@ class RedmineRocketChatWidget {
         this.boundTextarea = textarea;
         this.attachTextareaListeners(textarea);
       }
+      // Make clicking anywhere on the "Sign in to chat" input wrapper trigger the JOIN / Login button
+      if (textarea && textarea.disabled && textarea.placeholder === 'Sign in to chat') {
+        const inputWrapper = textarea.parentElement;
+        if (inputWrapper && !inputWrapper.dataset.rcSignInClickBound) {
+          inputWrapper.dataset.rcSignInClickBound = 'true';
+          inputWrapper.style.cursor = 'pointer';
+          inputWrapper.addEventListener('click', (e) => {
+            if (!textarea.disabled || textarea.placeholder !== 'Sign in to chat') return;
+            const joinBtn = inputWrapper.querySelector('button');
+            if (joinBtn && e.target !== joinBtn && !joinBtn.contains(e.target)) {
+              joinBtn.click();
+            }
+          });
+        }
+      } else if (textarea && textarea.parentElement && textarea.parentElement.style.cursor === 'pointer') {
+        textarea.parentElement.style.cursor = '';
+      }
       this.syncTopMenuHeight();
       this.rewriteMediaUrlsToProxy();
     };
