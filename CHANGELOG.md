@@ -25,7 +25,6 @@ All notable changes to **Redmine Subrocketchat** (`redmine_subrocketchat`, forme
   - Translates legacy `rooms.upload/:rid` calls to Rocket.Chat 8.x's two-step `rooms.media` + `rooms.mediaConfirm` upload workflow.
   - Translates deprecated `query={"tmid":...}` calls to `/api/v1/chat.getThreadMessages`.
   - Proxies authenticated `/file-upload/*` and `/ufs/*` media URLs and maps `channels.images` to `groups.files` so inline images, downloads, and the fullscreen `ImageGallery` lightbox work seamlessly in private project groups.
-- **Subsimplify Integration**: Automatically respects `RedmineSubsimplify` role and module visibility rules when `redmine_subsimplify` is installed.
 
 ## [1.0.2] - 2024-12-03
 
