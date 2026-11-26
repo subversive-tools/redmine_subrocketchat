@@ -60,13 +60,6 @@ Rails.configuration.to_prepare do
     if ActiveRecord::Base.connection.table_exists?('settings')
       RedmineSubrocketchat::SettingsHelper.migrate_legacy_settings!
     end
-
-    if ActiveRecord::Base.connection.table_exists?('roles') &&
-       Role.where(builtin: false).where.not(id: Role.joins(:permissions).where(permissions: [:access_chat]).pluck(:id)).exists?
-      Role.where(name: ['Manager', 'Developer']).each do |role|
-        role.add_permission! :access_chat
-      end
-    end
   rescue StandardError => e
     Rails.logger.warn("Subrocketchat init: Setup warning (#{e.message})")
   end

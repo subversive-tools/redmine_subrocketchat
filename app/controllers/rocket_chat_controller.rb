@@ -6,6 +6,72 @@ class RocketChatController < ApplicationController
   before_action :require_admin, only: [:admin_setup]
   before_action :find_project, :authorize, except: [:admin_setup]
 
+  # Strict allowlist of Rocket.Chat REST API endpoints that EmbeddedChat may call through the proxy.
+  # Any other endpoint (e.g. users.list, users.create, users.setActiveStatus, groups.listAll, settings/*, etc.) is rejected with 403 Forbidden.
+  ALLOWED_PROXY_GET_ENDPOINTS = %w[
+    api/v1/me
+    api/v1/rooms.info
+    api/v1/groups.info
+    api/v1/groups.messages
+    api/v1/groups.members
+    api/v1/groups.roles
+    api/v1/groups.files
+    api/v1/channels.images
+    api/v1/chat.getThreadMessages
+    api/v1/chat.getStarredMessages
+    api/v1/chat.getPinnedMessages
+    api/v1/chat.getMentionedMessages
+    api/v1/chat.search
+    api/v1/chat.syncMessages
+    api/v1/permissions.listAll
+    api/v1/roles.getUsersInRole
+    api/v1/commands.list
+    api/v1/users.info
+    api/v1/users.getStatus
+    api/v1/users.getUsernameSuggestion
+    api/v1/settings/Message_MaxAllowedSize
+  ].freeze
+
+  ALLOWED_PROXY_POST_ENDPOINTS = %w[
+    api/v1/login
+    api/v1/logout
+    api/v1/chat.sendMessage
+    api/v1/chat.delete
+    api/v1/chat.update
+    api/v1/chat.react
+    api/v1/chat.starMessage
+    api/v1/chat.unStarMessage
+    api/v1/chat.pinMessage
+    api/v1/chat.unPinMessage
+    api/v1/chat.reportMessage
+    api/v1/commands.run
+    api/v1/findOrCreateInvite
+  ].freeze
+
+  # Room-scoped endpoints where `roomId` / `rid` MUST equal the current Redmine project's Rocket.Chat room ID.
+  ROOM_SCOPED_GET_ENDPOINTS = %w[
+    api/v1/rooms.info
+    api/v1/groups.info
+    api/v1/groups.messages
+    api/v1/groups.members
+    api/v1/groups.roles
+    api/v1/groups.files
+    api/v1/channels.images
+    api/v1/chat.getStarredMessages
+    api/v1/chat.getPinnedMessages
+    api/v1/chat.getMentionedMessages
+    api/v1/chat.search
+    api/v1/chat.syncMessages
+  ].freeze
+
+  ROOM_SCOPED_POST_ENDPOINTS = %w[
+    api/v1/chat.sendMessage
+    api/v1/chat.delete
+    api/v1/chat.update
+    api/v1/commands.run
+    api/v1/findOrCreateInvite
+  ].freeze
+
   def show
     # Renders app/views/rocket_chat/show.html.erb
   end
@@ -115,7 +181,6 @@ class RocketChatController < ApplicationController
       }
 
     when 'apply_quick_setup'
-      # 1. Grant :access_chat permission to selected role IDs (or all non-builtin roles)
       role_ids = Array(params[:role_ids]).map(&:to_i).reject(&:zero?)
       Role.givable.find_each do |role|
         if role_ids.include?(role.id)
@@ -125,13 +190,11 @@ class RocketChatController < ApplicationController
         end
       end
 
-      # 2. Optionally add 'rocket_chat' to Redmine's default_projects_modules
       if params[:enable_default_module].to_s == 'true'
         mods = Array(Setting.default_projects_modules).map(&:to_s)
         Setting.default_projects_modules = (mods | ['rocket_chat'])
       end
 
-      # 3. Optionally enable rocket_chat module & sync channels on all active projects
       synced_projects = 0
       if params[:enable_all_projects].to_s == 'true'
         Project.active.find_each do |proj|
@@ -270,67 +333,104 @@ class RocketChatController < ApplicationController
     end
   end
 
-  # Transparent proxy for EmbeddedChat REST & media calls to avoid browser CORS preflight issues
-  # and bridge Rocket.Chat 8.x API changes (`rooms.media`, `chat.getThreadMessages`, `groups.files`).
+  # Hardened proxy for EmbeddedChat REST & media calls:
+  # - NEVER falls back to the bot/admin token for API calls.
+  # - Enforces a strict method & endpoint allowlist.
+  # - Restricts all room-scoped endpoints (and media downloads) to the current Redmine project's Rocket.Chat room (`rm_<project_identifier>`).
+  # - Verifies caller identity via `/api/v1/me` before auto-inviting on `rooms.info`.
   def proxy
     rc_base = (Setting.plugin_redmine_subrocketchat['rocket_chat_url_internal'].presence ||
                Setting.plugin_redmine_subrocketchat['rocket_chat_url']).to_s.chomp('/')
     rc_path = params[:rc_path].to_s
 
-    # All Redmine project channels are private groups (`groups.*`).
+    # Block path traversal or unexpected characters
+    if rc_path.include?('..') || rc_path.start_with?('/')
+      return render json: { status: 'error', error: 'Invalid proxy path' }, status: :forbidden
+    end
+
+    # 1. Media downloads: `GET /file-upload/:file_id/:filename` or `GET /ufs/:store/:file_id/:filename`
+    if request.method_symbol == :get && rc_path =~ /\A(?:file-upload\/([^\/]+)\/.+|ufs\/[^\/]+\/([^\/]+)\/.+)\z/
+      file_id = Regexp.last_match(1) || Regexp.last_match(2)
+      return proxy_project_media_download(rc_base, rc_path, file_id)
+    end
+
+    # 2. All Redmine project channels are private groups (`groups.*`).
     rc_path = rc_path.sub(/\Aapi\/v1\/channels\.(messages|members|roles|files|info)\z/, 'api/v1/groups.\1')
 
+    # 3. Stub `GET api/v1/settings/Message_MaxAllowedSize` (harmless static value)
     if request.method_symbol == :get && rc_path == 'api/v1/settings/Message_MaxAllowedSize'
       return render json: { _id: 'Message_MaxAllowedSize', value: 5000, success: true }, status: :ok
     end
 
-    if request.method_symbol == :post && rc_path =~ /\Aapi\/v1\/rooms\.upload\/([^\/\?]+)\z/
-      return proxy_rooms_upload_v8(rc_base, Regexp.last_match(1))
-    end
-
-    if request.method_symbol == :get && rc_path =~ /\Aapi\/v1\/(groups|channels)\.messages\z/ && params[:query].present?
-      return proxy_messages_with_query_v8(rc_base, rc_path)
-    end
-
-    if request.method_symbol == :get && (rc_path == 'api/v1/channels.images' || rc_path == 'api/v1/groups.files')
-      return proxy_room_files_v8(rc_base, images_only: rc_path == 'api/v1/channels.images')
-    end
-
+    # 4. Unauthenticated login endpoint: `POST api/v1/login`
     if request.method_symbol == :post && rc_path == 'api/v1/login'
       return proxy_login_and_ensure_room_member(rc_base)
     end
 
-    if request.method_symbol == :get && rc_path == 'api/v1/rooms.info' && params[:roomId].present?
-      return proxy_rooms_info_with_auto_invite(rc_base)
+    # 5. Require explicit user authentication headers (`X-Auth-Token` and `X-User-Id`) for ALL other API requests.
+    # NEVER fall back to the bot/admin token!
+    auth_token = request.headers['X-Auth-Token'].to_s.strip
+    rc_user_id = request.headers['X-User-Id'].to_s.strip
+    if auth_token.blank? || rc_user_id.blank?
+      return render json: { status: 'error', error: 'Authentication required (missing X-Auth-Token or X-User-Id)' }, status: :unauthorized
+    end
+
+    # 6. Upload endpoint: `POST api/v1/rooms.upload/:rid` (scoped to project room!)
+    if request.method_symbol == :post && rc_path =~ /\Aapi\/v1\/rooms\.upload\/([^\/\?]+)\z/
+      target_rid = Regexp.last_match(1)
+      unless valid_project_room_id?(target_rid)
+        return render json: { status: 'error', error: 'Access denied: room does not belong to this project' }, status: :forbidden
+      end
+      return proxy_rooms_upload_v8(rc_base, target_rid, auth_token, rc_user_id)
+    end
+
+    # 7. Enforce strict method & endpoint allowlist
+    method_sym = request.method_symbol
+    allowed = case method_sym
+              when :get
+                ALLOWED_PROXY_GET_ENDPOINTS.include?(rc_path)
+              when :post
+                ALLOWED_PROXY_POST_ENDPOINTS.include?(rc_path)
+              else
+                false
+              end
+
+    unless allowed
+      return render json: { status: 'error', error: "Endpoint not allowed by proxy: #{method_sym.to_s.upcase} #{rc_path}" }, status: :forbidden
+    end
+
+    # 8. Enforce project room boundary on all room-scoped endpoints
+    unless enforce_project_room_scope!(method_sym, rc_path)
+      return render json: { status: 'error', error: 'Access denied: request targets a room outside this project' }, status: :forbidden
+    end
+
+    # 9. Special Rocket.Chat 8.x compatibility handlers (using caller's own token!)
+    if method_sym == :get && rc_path == 'api/v1/rooms.info' && params[:roomId].present?
+      return proxy_rooms_info_with_auto_invite(rc_base, auth_token, rc_user_id)
+    end
+
+    if method_sym == :get && rc_path == 'api/v1/groups.messages' && params[:query].present?
+      return proxy_messages_with_query_v8(rc_base, rc_path, auth_token, rc_user_id)
+    end
+
+    if method_sym == :get && (rc_path == 'api/v1/channels.images' || rc_path == 'api/v1/groups.files')
+      return proxy_room_files_v8(rc_base, auth_token, rc_user_id, images_only: rc_path == 'api/v1/channels.images')
     end
 
     query_str = request.query_string.presence
-
     target_url = "#{rc_base}/#{rc_path}"
     target_url += "?#{query_str}" if query_str
 
     uri = URI(target_url)
-    method_class = case request.method_symbol
-                   when :get then Net::HTTP::Get
-                   when :post then Net::HTTP::Post
-                   when :put then Net::HTTP::Put
-                   when :delete then Net::HTTP::Delete
-                   else Net::HTTP::Get
-                   end
+    method_class = method_sym == :post ? Net::HTTP::Post : Net::HTTP::Get
 
     req = method_class.new(uri)
     req['Content-Type'] = request.content_type if request.content_type.present?
     req['Accept'] = request.headers['Accept'] || 'application/json'
+    req['X-Auth-Token'] = auth_token
+    req['X-User-Id'] = rc_user_id
 
-    auth_token = request.headers['X-Auth-Token'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_token']
-    rc_user_id = request.headers['X-User-Id'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_user_id']
-    req['X-Auth-Token'] = auth_token if auth_token.present?
-    req['X-User-Id'] = rc_user_id if rc_user_id.present?
-    if auth_token.present? && rc_user_id.present?
-      req['Cookie'] = "rc_uid=#{rc_user_id}; rc_token=#{auth_token}"
-    end
-
-    if [:post, :put].include?(request.method_symbol)
+    if method_sym == :post
       body_content = request.raw_post
       req.body = body_content if body_content.present?
     end
@@ -353,12 +453,108 @@ class RocketChatController < ApplicationController
 
   private
 
+  # Returns the Rocket.Chat room ID for the current Redmine project (`rm_<project_identifier>`).
+  def project_room_id
+    @project_room_id ||= RedmineSubrocketchat::RocketChatHelper.get_or_create_project_room_id(@project)
+  end
+
+  def valid_project_room_id?(candidate_rid)
+    expected = project_room_id
+    expected.present? && candidate_rid.to_s == expected.to_s
+  end
+
+  # Verifies that any room-scoped GET or POST request exclusively targets `@project`'s Rocket.Chat room.
+  def enforce_project_room_scope!(method_sym, rc_path)
+    if method_sym == :get && ROOM_SCOPED_GET_ENDPOINTS.include?(rc_path)
+      expected_rid = project_room_id
+      return false if expected_rid.blank?
+
+      req_rid = params[:roomId].presence || params[:rid].presence
+      if req_rid.present?
+        return req_rid.to_s == expected_rid.to_s
+      elsif params[:roomName].present?
+        return params[:roomName].to_s == RedmineSubrocketchat::RocketChatHelper.channel_name_for(@project)
+      else
+        return false
+      end
+    elsif method_sym == :post && ROOM_SCOPED_POST_ENDPOINTS.include?(rc_path)
+      expected_rid = project_room_id
+      return false if expected_rid.blank?
+
+      parsed_body = JSON.parse(request.raw_post.to_s) rescue {}
+      req_rid = case rc_path
+                when 'api/v1/chat.sendMessage'
+                  parsed_body.dig('message', 'rid') || parsed_body['rid'] || parsed_body['roomId']
+                else
+                  parsed_body['roomId'] || parsed_body['rid']
+                end
+      return req_rid.present? && req_rid.to_s == expected_rid.to_s
+    end
+
+    true
+  end
+
+  # Securely proxies media downloads (`/file-upload/:file_id/:filename` or `/ufs/:store/:file_id/:filename`).
+  # Browser `<img>`, `<audio>`, `<video>`, and `<a href>` tags do not attach `X-Auth-Token` headers.
+  # Before fetching the media stream, we verify that `file_id` belongs to the current project's Rocket.Chat group (`groups.files`)!
+  def proxy_project_media_download(rc_base, rc_path, file_id)
+    expected_rid = project_room_id
+    if expected_rid.blank? || file_id.blank? || !project_room_has_file?(rc_base, expected_rid, file_id)
+      return render json: { status: 'error', error: 'File not found in this project room' }, status: :forbidden
+    end
+
+    bot_token = Setting.plugin_redmine_subrocketchat['rocket_chat_token'].to_s
+    bot_uid = Setting.plugin_redmine_subrocketchat['rocket_chat_user_id'].to_s
+    if bot_token.blank? || bot_uid.blank?
+      return render json: { status: 'error', error: 'Rocket.Chat bot credentials not configured' }, status: :service_unavailable
+    end
+
+    query_str = request.query_string.presence
+    target_url = "#{rc_base}/#{rc_path}"
+    target_url += "?#{query_str}" if query_str
+
+    uri = URI(target_url)
+    req = Net::HTTP::Get.new(uri)
+    req['X-Auth-Token'] = bot_token
+    req['X-User-Id'] = bot_uid
+    req['Cookie'] = "rc_uid=#{bot_uid}; rc_token=#{bot_token}"
+
+    response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 30) do |http|
+      http.request(req)
+    end
+
+    render plain: response.body, status: response.code.to_i, content_type: (response['content-type'] || 'application/octet-stream')
+  end
+
+  # Checks via Rocket.Chat's `groups.files` API (scoped to `room_id` and filtered by `_id`) whether `file_id` belongs to the project room.
+  def project_room_has_file?(rc_base, room_id, file_id)
+    bot_token = Setting.plugin_redmine_subrocketchat['rocket_chat_token'].to_s
+    bot_uid = Setting.plugin_redmine_subrocketchat['rocket_chat_user_id'].to_s
+    return false if bot_token.blank? || bot_uid.blank?
+
+    query_json = { _id: file_id.to_s }.to_json
+    uri = URI("#{rc_base}/api/v1/groups.files?roomId=#{URI.encode_www_form_component(room_id)}&query=#{URI.encode_www_form_component(query_json)}&count=100")
+    req = Net::HTTP::Get.new(uri)
+    req['X-Auth-Token'] = bot_token
+    req['X-User-Id'] = bot_uid
+    req['Accept'] = 'application/json'
+
+    res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 8, read_timeout: 15) do |http|
+      http.request(req)
+    end
+    return false unless res.is_a?(Net::HTTPSuccess)
+
+    data = JSON.parse(res.body) rescue {}
+    files = data['files']
+    files.is_a?(Array) && files.any? { |f| f['_id'].to_s == file_id.to_s }
+  rescue StandardError
+    false
+  end
+
   # Intercepts `POST /api/v1/login` from EmbeddedChat. When the user successfully authenticates
   # (and has Redmine's `:access_chat` permission to reach this proxy), automatically ensures that
-  # the authenticated Rocket.Chat user (`data.userId`) is invited to the current project's private
-  # Rocket.Chat group (`rm_<project_identifier>`). This guarantees that:
-  # - Redmine admins (who may not be explicit project members) or users whose Redmine login differs
-  #   from their Rocket.Chat username never get kicked out with "Not Allowed" on `rooms.info`!
+  # the authenticated Rocket.Chat user (`data.userId`, verified by Rocket.Chat's own login response)
+  # is invited to the current project's private Rocket.Chat group (`rm_<project_identifier>`).
   def proxy_login_and_ensure_room_member(rc_base)
     uri = URI("#{rc_base}/api/v1/login")
     req = Net::HTTP::Post.new(uri)
@@ -385,27 +581,35 @@ class RocketChatController < ApplicationController
 
   # When a user switches to another Redmine project while already logged into EmbeddedChat (via cached token),
   # `GET /api/v1/rooms.info?roomId=...` is called first. If the user is authorized in Redmine (`:access_chat`)
-  # but not yet in this project's private Rocket.Chat group (`400 Not Allowed`), automatically invite their
-  # `X-User-Id` into the room and retry `rooms.info` so they never get logged out!
-  def proxy_rooms_info_with_auto_invite(rc_base)
+  # but not yet in this project's private Rocket.Chat group (`400 Not Allowed`), we first verify their
+  # `X-Auth-Token` + `X-User-Id` pair against `GET /api/v1/me` so a caller can NEVER spoof another user's `X-User-Id`
+  # to invite arbitrary users into the room!
+  def proxy_rooms_info_with_auto_invite(rc_base, auth_token, rc_user_id)
     room_id = params[:roomId].to_s
-    auth_token = request.headers['X-Auth-Token'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_token']
-    rc_user_id = request.headers['X-User-Id'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_user_id']
 
     uri = URI("#{rc_base}/api/v1/rooms.info?roomId=#{URI.encode_www_form_component(room_id)}")
     req = Net::HTTP::Get.new(uri)
-    req['X-Auth-Token'] = auth_token if auth_token.present?
-    req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    req['X-Auth-Token'] = auth_token
+    req['X-User-Id'] = rc_user_id
     req['Accept'] = 'application/json'
 
     res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
       http.request(req)
     end
 
-    if !res.is_a?(Net::HTTPSuccess) && rc_user_id.present? && @project
-      RedmineSubrocketchat::RocketChatHelper.ensure_rc_user_id_in_project_channel(rc_user_id, @project)
-      res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
-        http.request(req)
+    if !res.is_a?(Net::HTTPSuccess) && @project
+      # Verify the caller actually owns `rc_user_id` by validating `auth_token` against `/api/v1/me`
+      me_res = rc_raw_request(
+        "#{rc_base}/api/v1/me",
+        method: :get,
+        headers: { 'X-Auth-Token' => auth_token, 'X-User-Id' => rc_user_id }
+      )
+      verified_uid = me_res[:ok] ? me_res[:json]['_id'].to_s : nil
+      if verified_uid.present? && verified_uid == rc_user_id
+        RedmineSubrocketchat::RocketChatHelper.ensure_rc_user_id_in_project_channel(verified_uid, @project)
+        res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
+          http.request(req)
+        end
       end
     end
 
@@ -413,16 +617,14 @@ class RocketChatController < ApplicationController
   end
 
   # Translates `GET /api/v1/channels.images?roomId=...` and `GET /api/v1/groups.files?roomId=...`
-  # so ImageGallery and FileGallery work in private groups and their URLs use our authenticated Redmine proxy.
-  def proxy_room_files_v8(rc_base, images_only: false)
+  # using ONLY the caller's own `X-Auth-Token` and `X-User-Id`.
+  def proxy_room_files_v8(rc_base, auth_token, rc_user_id, images_only: false)
     room_id = params[:roomId].to_s
-    auth_token = request.headers['X-Auth-Token'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_token']
-    rc_user_id = request.headers['X-User-Id'].presence || Setting.plugin_redmine_subrocketchat['rocket_chat_user_id']
 
     uri = URI("#{rc_base}/api/v1/groups.files?roomId=#{URI.encode_www_form_component(room_id)}&count=100")
     req = Net::HTTP::Get.new(uri)
-    req['X-Auth-Token'] = auth_token if auth_token.present?
-    req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    req['X-Auth-Token'] = auth_token
+    req['X-User-Id'] = rc_user_id
     req['Accept'] = 'application/json'
 
     res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
@@ -448,17 +650,15 @@ class RocketChatController < ApplicationController
 
   # Rocket.Chat 7.0+ / 8.x disabled arbitrary MongoDB `query={"tmid":...}` parameters on `groups.messages` / `channels.messages` by default.
   # This helper transparently translates thread queries to `chat.getThreadMessages` and filters top-level room messages (`tmid: {$exists: false}`).
-  def proxy_messages_with_query_v8(rc_base, rc_path)
+  def proxy_messages_with_query_v8(rc_base, rc_path, auth_token, rc_user_id)
     query_hash = JSON.parse(params[:query].to_s) rescue {}
     tmid_param = query_hash['tmid']
-    auth_token = request.headers['X-Auth-Token']
-    rc_user_id = request.headers['X-User-Id']
 
     if tmid_param.is_a?(String) && tmid_param.present?
       uri = URI("#{rc_base}/api/v1/chat.getThreadMessages?tmid=#{URI.encode_www_form_component(tmid_param)}")
       req = Net::HTTP::Get.new(uri)
-      req['X-Auth-Token'] = auth_token if auth_token.present?
-      req['X-User-Id'] = rc_user_id if rc_user_id.present?
+      req['X-Auth-Token'] = auth_token
+      req['X-User-Id'] = rc_user_id
       req['Accept'] = 'application/json'
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
@@ -468,7 +668,9 @@ class RocketChatController < ApplicationController
       if res.is_a?(Net::HTTPSuccess)
         data = JSON.parse(res.body) rescue {}
         if data['messages'].is_a?(Array)
+          expected_rid = project_room_id
           data['messages'] = data['messages']
+                               .select { |m| m['rid'].to_s == expected_rid.to_s }
                                .reject { |m| m['_id'] == tmid_param }
                                .sort_by { |m| m['ts'].to_s }
                                .reverse
@@ -481,8 +683,8 @@ class RocketChatController < ApplicationController
     room_id = params[:roomId].to_s
     uri = URI("#{rc_base}/#{rc_path}?roomId=#{URI.encode_www_form_component(room_id)}&count=100")
     req = Net::HTTP::Get.new(uri)
-    req['X-Auth-Token'] = auth_token if auth_token.present?
-    req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    req['X-Auth-Token'] = auth_token
+    req['X-User-Id'] = rc_user_id
     req['Accept'] = 'application/json'
 
     res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 10, read_timeout: 20) do |http|
@@ -503,14 +705,11 @@ class RocketChatController < ApplicationController
   # Translates `POST /api/v1/rooms.upload/:rid` (removed in Rocket.Chat 8.0) into:
   # 1) `POST /api/v1/rooms.media/:rid` (multipart file upload)
   # 2) `POST /api/v1/rooms.mediaConfirm/:rid/:fileId` (JSON confirmation with description & tmid)
-  def proxy_rooms_upload_v8(rc_base, room_id)
-    auth_token = request.headers['X-Auth-Token']
-    rc_user_id = request.headers['X-User-Id']
-
+  def proxy_rooms_upload_v8(rc_base, room_id, auth_token, rc_user_id)
     media_uri = URI("#{rc_base}/api/v1/rooms.media/#{URI.encode_www_form_component(room_id)}")
     media_req = Net::HTTP::Post.new(media_uri)
-    media_req['X-Auth-Token'] = auth_token if auth_token.present?
-    media_req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    media_req['X-Auth-Token'] = auth_token
+    media_req['X-User-Id'] = rc_user_id
     media_req['Accept'] = 'application/json'
 
     uploaded_file = params[:file]
@@ -550,8 +749,8 @@ class RocketChatController < ApplicationController
 
     confirm_uri = URI("#{rc_base}/api/v1/rooms.mediaConfirm/#{URI.encode_www_form_component(room_id)}/#{URI.encode_www_form_component(file_id)}")
     confirm_req = Net::HTTP::Post.new(confirm_uri)
-    confirm_req['X-Auth-Token'] = auth_token if auth_token.present?
-    confirm_req['X-User-Id'] = rc_user_id if rc_user_id.present?
+    confirm_req['X-Auth-Token'] = auth_token
+    confirm_req['X-User-Id'] = rc_user_id
     confirm_req['Content-Type'] = 'application/json'
     confirm_req['Accept'] = 'application/json'
 
