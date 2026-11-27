@@ -5,17 +5,22 @@ module RedmineSubrocketchat
     extend ActiveSupport::Concern
 
     included do
-      after_create :add_user_to_rocket_chat
+      after_commit :sync_user_rocket_chat_membership, on: [:create, :update]
       after_destroy :remove_user_from_rocket_chat
     end
 
-    def add_user_to_rocket_chat
+    def sync_user_rocket_chat_membership
       return if user.nil? || user.anonymous?
       return unless project&.module_enabled?(:rocket_chat)
 
-      success = RedmineSubrocketchat::RocketChatHelper.add_member_to_channel(user, "rm_#{project.identifier}")
-      unless success
-        Rails.logger.error("Rocket.Chat: User #{user.login} could not be added to Rocket.Chat channel.")
+      channel_name = "rm_#{project.identifier}"
+      if user.allowed_to?(:access_chat, project)
+        success = RedmineSubrocketchat::RocketChatHelper.add_member_to_channel(user, channel_name)
+        unless success
+          Rails.logger.error("Rocket.Chat: User #{user.login} could not be added to Rocket.Chat channel.")
+        end
+      else
+        RedmineSubrocketchat::RocketChatHelper.remove_member_from_channel(user, channel_name)
       end
     end
 

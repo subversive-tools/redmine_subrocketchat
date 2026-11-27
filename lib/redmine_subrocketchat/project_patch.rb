@@ -20,10 +20,7 @@ module RedmineSubrocketchat
     end
 
     def handle_module_changes
-      new_modules = enabled_modules.map(&:name)
-      previous_modules = enabled_modules_was || []
-
-      if !previous_modules.include?('rocket_chat') && new_modules.include?('rocket_chat')
+      if enabled_modules.map(&:name).include?('rocket_chat')
         RedmineSubrocketchat::RocketChatHelper.sync_channel_and_members(self)
       end
     end

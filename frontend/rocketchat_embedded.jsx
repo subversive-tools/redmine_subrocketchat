@@ -40,8 +40,14 @@ function installRocketChatFetchProxy(rcHost, proxyBaseUrl) {
     if (cleanHost && currentProxyBase && urlStr.startsWith(cleanHost + '/api/')) {
       const relativePath = urlStr.slice(cleanHost.length + 1); // e.g. "api/v1/login"
       const proxiedUrl = `${currentProxyBase}/${relativePath}`;
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+      const mergedHeaders = new Headers(init.headers || (typeof input !== 'string' ? input?.headers : undefined) || {});
+      if (csrfToken && !mergedHeaders.has('X-CSRF-Token')) {
+        mergedHeaders.set('X-CSRF-Token', csrfToken);
+      }
       return origFetch(proxiedUrl, {
         ...init,
+        headers: mergedHeaders,
         credentials: 'same-origin',
       });
     }

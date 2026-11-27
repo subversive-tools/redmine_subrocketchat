@@ -290,6 +290,8 @@ module RedmineSubrocketchat
       # Public: Posts a Redmine issue journal update (notes / status change) as a reply inside the issue's thread
       def post_issue_journal_to_thread(issue, journal)
         return nil unless issue && journal && issue.respond_to?(:rocketchat_thread_id) && issue.rocketchat_thread_id.present?
+        return nil if issue.respond_to?(:is_private?) && issue.is_private?
+        return nil if journal.respond_to?(:private_notes?) && journal.private_notes?
 
         room_id = get_or_create_project_room_id(issue.project)
         return nil unless room_id
@@ -302,7 +304,7 @@ module RedmineSubrocketchat
         if journal.details.any?
           lines << "Status: **#{issue.status&.name}** | Assigned: **#{issue.assigned_to&.name || '-'}** | Done: #{issue.done_ratio}%"
         end
-        if journal.notes.present?
+        if journal.notes.present? && !(journal.respond_to?(:private_notes?) && journal.private_notes?)
           lines << "> #{journal.notes.to_s.strip.truncate(400).gsub(/\r?\n/, "\n> ")}"
         end
 
@@ -360,7 +362,11 @@ module RedmineSubrocketchat
         return log("Failed to retrieve room ID for channel '#{channel_name}'", level: :error, context: project.identifier) unless room_id
 
         current_members = fetch_channel_members(room_id)
-        project_users = project.members.map(&:user).compact.reject(&:anonymous?)
+        project_users = project.members
+                               .map(&:user)
+                               .compact
+                               .reject(&:anonymous?)
+                               .select { |u| u.allowed_to?(:access_chat, project) }
         admin_logins = User.active.where(admin: true).pluck(:login)
         project_logins = project_users.map(&:login)
 
