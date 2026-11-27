@@ -12,6 +12,11 @@ module RedmineSubrocketchat
       after_update :handle_module_changes
       after_destroy :remove_rocket_chat_channel
     end
+  end
+end if !defined?(RedmineSubrocketchat::ProjectPatch)
+
+module RedmineSubrocketchat
+  module ProjectPatch
 
     def create_rocket_chat_channel
       if enabled_modules.map(&:name).include?('rocket_chat')

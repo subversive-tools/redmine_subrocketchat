@@ -8,6 +8,11 @@ module RedmineSubrocketchat
       after_create_commit :create_rocket_chat_thread_on_create
       after_update_commit :notify_rocket_chat_thread_on_update
     end
+  end
+end if !defined?(RedmineSubrocketchat::IssuePatch)
+
+module RedmineSubrocketchat
+  module IssuePatch
 
     def create_rocket_chat_thread_on_create
       return unless project&.module_enabled?(:rocket_chat)

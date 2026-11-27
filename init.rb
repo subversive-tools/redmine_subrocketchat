@@ -42,13 +42,11 @@ Redmine::Plugin.register :redmine_subrocketchat do
   }, partial: 'settings/rocket_chat_settings'
 end
 
-# Load hooks, model patches, controller, and routes
-require File.expand_path('lib/redmine_subrocketchat/view_hooks', __dir__)
-require File.expand_path('lib/redmine_subrocketchat/project_patch', __dir__)
-require File.expand_path('lib/redmine_subrocketchat/member_patch', __dir__)
-require File.expand_path('lib/redmine_subrocketchat/issue_patch', __dir__)
-require File.expand_path('app/controllers/rocket_chat_controller', __dir__)
-require File.expand_path('config/routes', __dir__)
+# Load hooks and model patches (controllers in app/controllers/ and routes in config/routes.rb are autoloaded by Redmine/Rails)
+require_relative 'lib/redmine_subrocketchat/view_hooks'
+require_relative 'lib/redmine_subrocketchat/project_patch'
+require_relative 'lib/redmine_subrocketchat/member_patch'
+require_relative 'lib/redmine_subrocketchat/issue_patch'
 
 # Set up model patches, legacy settings migration, and default role permissions inside `to_prepare`
 Rails.configuration.to_prepare do

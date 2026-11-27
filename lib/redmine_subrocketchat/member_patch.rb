@@ -8,6 +8,11 @@ module RedmineSubrocketchat
       after_commit :sync_user_rocket_chat_membership, on: [:create, :update]
       after_destroy :remove_user_from_rocket_chat
     end
+  end
+end if !defined?(RedmineSubrocketchat::MemberPatch)
+
+module RedmineSubrocketchat
+  module MemberPatch
 
     def sync_user_rocket_chat_membership
       return if user.nil? || user.anonymous?
