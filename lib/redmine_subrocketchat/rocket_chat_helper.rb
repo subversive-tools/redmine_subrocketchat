@@ -202,7 +202,7 @@ module RedmineSubrocketchat
         if project
           channel_name = channel_name_for(project)
           room_id = get_or_create_project_room_id(project)
-          if room_id && (project.users.include?(user) || user.admin?) && rc_user_id.present?
+          if room_id && (user.allowed_to?(:access_chat, project) || project.users.include?(user) || user.admin?) && rc_user_id.present?
             current_members = fetch_channel_members(room_id)
             manage_channel_user(:add, user.login, channel_name, room_id: room_id) unless current_members.include?(user.login)
           end

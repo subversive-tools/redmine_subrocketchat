@@ -248,23 +248,53 @@ function RedmineEmbeddedChatApp({ config, isSidebar, onToggleSidebar }) {
     }
   }, [config.auth_token]);
 
-  // Automatically open the Login modal whenever the user is unauthenticated (after initial autoLogin completes)
+  // Automatically open the Login modal when the user is truly unauthenticated (no stored token after autoLogin),
+  // and automatically close the Login modal as soon as authentication (or token resume) succeeds!
   useEffect(() => {
     if (!useUserStore || !useLoginStore || !useTotpStore) return;
+    let openTimer = null;
+
     const syncLoginModal = () => {
       const isAuth = useUserStore.getState()?.isUserAuthenticated;
       const loginState = useLoginStore.getState();
       const isTotp = useTotpStore.getState()?.isTotpModalOpen;
-      if (!isAuth && !loginState?.isLoginIn && !isTotp && !loginState?.isLoginModalOpen) {
-        loginState?.setIsLoginModalOpen?.(true);
+
+      if (isAuth) {
+        if (openTimer) {
+          clearTimeout(openTimer);
+          openTimer = null;
+        }
+        if (loginState?.isLoginModalOpen) {
+          loginState?.setIsLoginModalOpen?.(false);
+        }
+        return;
+      }
+
+      if (!loginState?.isLoginIn && !isTotp && !loginState?.isLoginModalOpen && !openTimer) {
+        const hasStoredToken =
+          typeof localStorage !== 'undefined' && !!localStorage.getItem('ec_token');
+        openTimer = setTimeout(
+          () => {
+            openTimer = null;
+            const curAuth = useUserStore.getState()?.isUserAuthenticated;
+            const curLogin = useLoginStore.getState();
+            const curTotp = useTotpStore.getState()?.isTotpModalOpen;
+            if (!curAuth && !curLogin?.isLoginIn && !curTotp && !curLogin?.isLoginModalOpen) {
+              curLogin?.setIsLoginModalOpen?.(true);
+            }
+          },
+          hasStoredToken ? 3500 : 800
+        );
       }
     };
-    const t = setTimeout(syncLoginModal, 450);
+
+    const t = setTimeout(syncLoginModal, 600);
     const unsubUser = useUserStore.subscribe ? useUserStore.subscribe(syncLoginModal) : null;
     const unsubLogin = useLoginStore.subscribe ? useLoginStore.subscribe(syncLoginModal) : null;
     const unsubTotp = useTotpStore.subscribe ? useTotpStore.subscribe(syncLoginModal) : null;
     return () => {
       clearTimeout(t);
+      if (openTimer) clearTimeout(openTimer);
       if (typeof unsubUser === 'function') unsubUser();
       if (typeof unsubLogin === 'function') unsubLogin();
       if (typeof unsubTotp === 'function') unsubTotp();

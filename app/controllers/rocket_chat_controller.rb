@@ -455,7 +455,8 @@ class RocketChatController < ApplicationController
     end
 
     query_str = request.query_string.presence
-    target_url = "#{rc_base}/#{rc_path}"
+    encoded_path = rc_path.split('/').map { |seg| ERB::Util.url_encode(seg) }.join('/')
+    target_url = "#{rc_base}/#{encoded_path}"
     target_url += "?#{query_str}" if query_str
 
     uri = URI(target_url)
@@ -594,7 +595,8 @@ class RocketChatController < ApplicationController
     end
 
     query_str = request.query_string.presence
-    target_url = "#{rc_base}/#{rc_path}"
+    encoded_path = rc_path.split('/').map { |seg| ERB::Util.url_encode(seg) }.join('/')
+    target_url = "#{rc_base}/#{encoded_path}"
     target_url += "?#{query_str}" if query_str
 
     uri = URI(target_url)
