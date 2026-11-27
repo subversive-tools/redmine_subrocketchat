@@ -7,10 +7,21 @@ module RedmineSubrocketchat
     def self.migrate_legacy_settings!
       return if Setting.where(name: 'plugin_redmine_subrocketchat').exists?
 
-      legacy = Setting.find_by(name: 'plugin_redmine_rocketchat')
-      return unless legacy && legacy.value.present?
+      legacy_raw = Setting.where(name: 'plugin_redmine_rocketchat').pick(:value)
+      return if legacy_raw.blank?
 
-      Setting.plugin_redmine_subrocketchat = legacy.value
+      clean_raw = legacy_raw.is_a?(String) ? legacy_raw.sub('--- !ruby/hash:ActiveSupport::HashWithIndifferentAccess', '---') : legacy_raw
+      legacy_hash = if clean_raw.is_a?(Hash)
+                      clean_raw.to_h
+                    elsif YAML.respond_to?(:unsafe_load)
+                      YAML.unsafe_load(clean_raw).to_h
+                    else
+                      YAML.load(clean_raw).to_h
+                    end
+
+      return if legacy_hash.blank?
+
+      Setting.plugin_redmine_subrocketchat = legacy_hash
       Rails.logger.info('Redmine Subrocketchat: Migrated settings from legacy plugin_redmine_rocketchat.')
     rescue StandardError => e
       Rails.logger.warn("Redmine Subrocketchat: Could not migrate legacy settings (#{e.message})")

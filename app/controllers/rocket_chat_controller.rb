@@ -3,6 +3,7 @@
 
 class RocketChatController < ApplicationController
   before_action :require_admin, only: [:admin_setup]
+  before_action :ensure_legacy_settings_migrated
   before_action :find_project, :authorize, except: [:admin_setup]
 
   # Strict allowlist of Rocket.Chat REST API endpoints that EmbeddedChat may call through the proxy.
@@ -875,6 +876,10 @@ class RocketChatController < ApplicationController
 
   def find_project
     @project = Project.find(params[:project_id])
+  end
+
+  def ensure_legacy_settings_migrated
+    RedmineSubrocketchat::SettingsHelper.migrate_legacy_settings!
   end
 
   def rc_raw_request(url_str, method: :get, headers: {}, payload: nil)
