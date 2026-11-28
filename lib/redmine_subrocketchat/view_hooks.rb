@@ -3,15 +3,29 @@
 module RedmineSubrocketchat
   class ViewHooks < Redmine::Hook::ViewListener
     # Checks whether the current user is allowed to see Rocket.Chat (respecting Redmine permissions and Subsimplify)
+    # While Rocket.Chat is not configured yet, hide the sidebar/chat UI completely for non-admin users.
     def rocket_chat_allowed?(project)
       return false unless project&.module_enabled?(:rocket_chat)
       return false unless User.current.allowed_to?(:access_chat, project)
+      return false unless RedmineSubrocketchat::RocketChatHelper.configured? || User.current.admin?
 
       if defined?(RedmineSubsimplify::Configuration) && RedmineSubsimplify::Configuration.simplified_user?
         return false unless RedmineSubsimplify::Configuration.allowed_modules.include?('rocket_chat')
       end
 
       true
+    end
+
+    # Adds a contextual "Chat" action link (between Edit and Watch) on the issue detail view (only when configured)
+    def view_issues_show_details_bottom(context = {})
+      project = context[:project]
+      issue = context[:issue]
+      return '' unless rocket_chat_allowed?(project) && RedmineSubrocketchat::RocketChatHelper.configured? && issue
+
+      context[:controller].send(:render_to_string, {
+        partial: 'rocket_chat/issue_thread_box',
+        locals: { project: project, issue: issue }
+      })
     end
 
     # Adds stylesheets and the EmbeddedChat bundle when a project with rocket_chat enabled is in context
@@ -39,18 +53,6 @@ module RedmineSubrocketchat
           locals: context
         })
       end
-    end
-
-    # Adds a contextual "Chat" action link (between Edit and Watch) on the issue detail view
-    def view_issues_show_details_bottom(context = {})
-      project = context[:project]
-      issue = context[:issue]
-      return '' unless rocket_chat_allowed?(project) && issue
-
-      context[:controller].send(:render_to_string, {
-        partial: 'rocket_chat/issue_thread_box',
-        locals: { project: project, issue: issue }
-      })
     end
 
     # When Rocket.Chat is not yet configured, adds a small inline warning & link to plugin settings

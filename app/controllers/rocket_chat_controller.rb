@@ -102,6 +102,7 @@ class RocketChatController < ApplicationController
   ].freeze
 
   def show
+    return render_403 if !RedmineSubrocketchat::RocketChatHelper.configured? && !User.current.admin?
     # Renders app/views/rocket_chat/show.html.erb
   end
 

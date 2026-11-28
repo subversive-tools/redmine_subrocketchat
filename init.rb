@@ -19,12 +19,13 @@ Redmine::Plugin.register :redmine_subrocketchat do
     }
   end
 
-  # Add Rocket.Chat tab in the project menu
+  # Add Rocket.Chat tab in the project menu (hidden for non-admin users while Rocket.Chat is not configured yet)
   menu :project_menu, :rocket_chat,
        { controller: 'rocket_chat', action: 'show' },
        caption: proc { I18n.t('rocketchat.init.menu_caption', default: 'Chat') },
        after: :wiki,
-       param: :project_id
+       param: :project_id,
+       if: proc { |_project| RedmineSubrocketchat::RocketChatHelper.configured? || User.current.admin? }
 
   # Plugin settings (visible in the Redmine admin panel)
   settings default: {
