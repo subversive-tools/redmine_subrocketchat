@@ -259,6 +259,13 @@ class RocketChatController < ApplicationController
   # GET /projects/:project_id/rocket_chat/session
   # Returns JSON configuration for EmbeddedChat (host, roomId, channelName, authToken, optional issue thread info)
   def session_config
+    unless RedmineSubrocketchat::RocketChatHelper.configured?
+      return render json: {
+        configured: false,
+        settings_url: User.current.admin? ? '/settings/plugin/redmine_subrocketchat' : nil
+      }
+    end
+
     channel_name = RedmineSubrocketchat::RocketChatHelper.channel_name_for(@project)
     room_id = RedmineSubrocketchat::RocketChatHelper.get_or_create_project_room_id(@project)
     auth_token = RedmineSubrocketchat::RocketChatHelper.create_user_login_token(User.current, project: @project)

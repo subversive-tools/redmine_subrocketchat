@@ -539,3 +539,89 @@ body .ec-modal-footer button.ec-button {
 .rc-ContextualThreadLink.is-active .rc-ContextualThreadLink-dot {
   display: inline-block;
 }
+
+/* Unconfigured Rocket.Chat Notice in Sidebar & Chat Tab */
+.rc-UnconfiguredWrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--rc-theme-bg, #ffffff);
+  color: var(--rc-theme-fg, #212136);
+}
+
+.rc-UnconfiguredHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--rc-top-menu-height, 28px);
+  min-height: var(--rc-top-menu-height, 28px);
+  padding: 0 10px;
+  background: var(--rc-theme-secondary, #f4f6f8);
+  border-bottom: 1px solid var(--rc-theme-border, #d8dee4);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rc-UnconfiguredBody {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.rc-UnconfiguredCard {
+  max-width: 340px;
+  width: 100%;
+  background: var(--rc-theme-secondary, #f8fafc);
+  border: 1px dashed var(--rc-theme-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 20px 18px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rc-UnconfiguredIcon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.rc-UnconfiguredTitle {
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--rc-theme-fg, #1e293b) !important;
+}
+
+.rc-UnconfiguredText {
+  margin: 0 0 14px 0 !important;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--rc-theme-fg, #475569);
+  opacity: 0.88;
+}
+
+.rc-UnconfiguredBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 5px;
+  background: var(--rc-theme-primary, #2563eb);
+  color: #ffffff !important;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: opacity 0.15s ease;
+}
+
+.rc-UnconfiguredBtn:hover {
+  opacity: 0.9;
+  color: #ffffff !important;
+  text-decoration: none !important;
+}

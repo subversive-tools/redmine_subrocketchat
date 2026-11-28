@@ -16,6 +16,7 @@ module RedmineSubrocketchat
 
     def create_rocket_chat_thread_on_create
       return unless project&.module_enabled?(:rocket_chat)
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
       return unless Setting.plugin_redmine_subrocketchat['auto_create_issue_threads'] == 'true'
       # Never auto-publish private issues into the shared project channel
       return if respond_to?(:is_private?) && is_private?
@@ -27,6 +28,7 @@ module RedmineSubrocketchat
 
     def notify_rocket_chat_thread_on_update
       return unless project&.module_enabled?(:rocket_chat)
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
       return unless Setting.plugin_redmine_subrocketchat['post_issue_updates_to_thread'] == 'true'
       return if rocketchat_thread_id.blank?
       return if respond_to?(:is_private?) && is_private?

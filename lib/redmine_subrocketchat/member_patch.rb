@@ -17,6 +17,7 @@ module RedmineSubrocketchat
     def sync_user_rocket_chat_membership
       return if user.nil? || user.anonymous?
       return unless project&.module_enabled?(:rocket_chat)
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
 
       channel_name = "rm_#{project.identifier}"
       if user.allowed_to?(:access_chat, project)
@@ -32,6 +33,7 @@ module RedmineSubrocketchat
     def remove_user_from_rocket_chat
       return if user.nil? || user.anonymous?
       return unless project&.module_enabled?(:rocket_chat)
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
 
       RedmineSubrocketchat::RocketChatHelper.remove_member_from_channel(user, "rm_#{project.identifier}")
     end

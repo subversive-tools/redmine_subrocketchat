@@ -11,6 +11,12 @@ de:
       open_full_client: "Im vollständigen Rocket.Chat-Client öffnen"
       toggle_sidebar: "Chat-Sidebar ein-/ausklappen"
       resize_sidebar: "Breite ändern (Doppelklick zum Zurücksetzen)"
+      unconfigured_title: "Rocket.Chat ist noch nicht fertig konfiguriert"
+      unconfigured_admin_text: "Bitte richte die Rocket.Chat-Server-URL und die Bot-Verbindung über den 1-Klick-Assistenten in den Plugin-Einstellungen ein."
+      unconfigured_user_text: "Die Verbindung zum Rocket.Chat-Server wurde noch nicht eingerichtet. Bitte wende dich an einen Redmine-Administrator."
+      open_plugin_settings: "Zu den Rocket.Chat-Einstellungen"
+      module_unconfigured_short: "nicht konfiguriert"
+      module_settings_link: "Einstellungen"
     autocomplete:
       title: "Ticket verlinken oder Thread öffnen (#)"
       hint: "↑↓ Auswahl · Enter: Link einfügen · Shift+Enter: Thread öffnen"

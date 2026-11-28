@@ -4,11 +4,13 @@
   issue_obj = (defined?(issue) && issue.present?) ? issue : (@issue if defined?(@issue) && @issue&.persisted?)
   channel_name = RedmineSubrocketchat::RocketChatHelper.channel_name_for(proj)
   rc_url = Setting.plugin_redmine_subrocketchat['rocket_chat_url'].to_s.chomp('/')
+  rc_configured = RedmineSubrocketchat::RocketChatHelper.configured?
 %>
 <div class="rc-embedded-wrapper"
      data-project-id="<%= proj.identifier %>"
      data-channel-name="<%= channel_name %>"
      data-rc-url="<%= rc_url %>"
+     data-configured="<%= rc_configured ? 'true' : 'false' %>"
      data-session-url="<%= "/projects/#{proj.identifier}/rocket_chat/session" %>"
      data-issues-url="<%= "/projects/#{proj.identifier}/rocket_chat/issues" %>"
      data-thread-base-url="<%= "/projects/#{proj.identifier}/rocket_chat/issue_thread" %>"
@@ -17,15 +19,49 @@
      data-issue-thread-id="<%= issue_obj.respond_to?(:rocketchat_thread_id) ? issue_obj&.rocketchat_thread_id : '' %>"
      data-mode="<%= mode %>">
 
-  <!-- Target mount container for @embeddedchat/react -->
-  <div class="rc-EmbeddedMount"></div>
+  <% if rc_configured %>
+    <!-- Target mount container for @embeddedchat/react -->
+    <div class="rc-EmbeddedMount"></div>
 
-  <!-- #1234 Issue Autocomplete Dropdown -->
-  <div class="rc-IssueAutocomplete" style="display: none;">
-    <div class="rc-IssueAutocomplete-header">
-      <span><%= l(:'rocketchat.autocomplete.title', default: 'Ticket verlinken oder Thread öffnen (#)') %></span>
-      <small><%= l(:'rocketchat.autocomplete.hint', default: '↑↓ Auswahl · Enter: Link · Shift+Enter: Thread') %></small>
+    <!-- #1234 Issue Autocomplete Dropdown -->
+    <div class="rc-IssueAutocomplete" style="display: none;">
+      <div class="rc-IssueAutocomplete-header">
+        <span><%= l(:'rocketchat.autocomplete.title', default: 'Ticket verlinken oder Thread öffnen (#)') %></span>
+        <small><%= l(:'rocketchat.autocomplete.hint', default: '↑↓ Auswahl · Enter: Link · Shift+Enter: Thread') %></small>
+      </div>
+      <ul class="rc-IssueAutocomplete-list"></ul>
     </div>
-    <ul class="rc-IssueAutocomplete-list"></ul>
-  </div>
+  <% else %>
+    <!-- Unconfigured Rocket.Chat Notice in Sidebar / Chat Page -->
+    <div class="rc-UnconfiguredWrap">
+      <% if mode == 'sidebar' %>
+        <div class="rc-UnconfiguredHeader">
+          <span class="rc-UnconfiguredHeader-title">Rocket.Chat</span>
+          <button type="button"
+                  class="rc-SidebarToggleBtn"
+                  title="<%= l(:'rocketchat.ui.toggle_sidebar', default: 'Chat-Sidebar ein-/ausklappen') %>">✕</button>
+        </div>
+      <% end %>
+      <div class="rc-UnconfiguredBody">
+        <div class="rc-UnconfiguredCard">
+          <div class="rc-UnconfiguredIcon">⚠️</div>
+          <h4 class="rc-UnconfiguredTitle">
+            <%= l(:'rocketchat.ui.unconfigured_title', default: 'Rocket.Chat ist noch nicht fertig konfiguriert') %>
+          </h4>
+          <p class="rc-UnconfiguredText">
+            <% if User.current.admin? %>
+              <%= l(:'rocketchat.ui.unconfigured_admin_text', default: 'Bitte richte die Rocket.Chat-Server-URL und die Bot-Verbindung über den 1-Klick-Assistenten in den Plugin-Einstellungen ein.') %>
+            <% else %>
+              <%= l(:'rocketchat.ui.unconfigured_user_text', default: 'Die Verbindung zum Rocket.Chat-Server wurde noch nicht eingerichtet. Bitte wende dich an einen Redmine-Administrator.') %>
+            <% end %>
+          </p>
+          <% if User.current.admin? %>
+            <a href="/settings/plugin/redmine_subrocketchat" class="rc-UnconfiguredBtn">
+              ⚙️ <%= l(:'rocketchat.ui.open_plugin_settings', default: 'Zu den Rocket.Chat-Einstellungen') %>
+            </a>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
 </div>

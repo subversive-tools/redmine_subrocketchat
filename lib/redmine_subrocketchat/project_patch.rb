@@ -19,18 +19,24 @@ module RedmineSubrocketchat
   module ProjectPatch
 
     def create_rocket_chat_channel
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
+
       if enabled_modules.map(&:name).include?('rocket_chat')
         RedmineSubrocketchat::RocketChatHelper.create_rocket_chat_channel(self)
       end
     end
 
     def handle_module_changes
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
+
       if enabled_modules.map(&:name).include?('rocket_chat')
         RedmineSubrocketchat::RocketChatHelper.sync_channel_and_members(self)
       end
     end
 
     def remove_rocket_chat_channel
+      return unless RedmineSubrocketchat::RocketChatHelper.configured?
+
       RedmineSubrocketchat::RocketChatHelper.delete_channel("rm_#{identifier}")
     end
 

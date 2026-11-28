@@ -356,6 +356,11 @@ class RedmineRocketChatWidget {
     this.setupSidebarResizer();
     this.setupThreadButtons();
     this.setupIntraProjectTurboNavigation();
+    if (this.wrapper.dataset.configured === 'false' || !this.mountEl) {
+      this.syncTopMenuHeight();
+      window.addEventListener('resize', () => this.syncTopMenuHeight());
+      return;
+    }
     await this.loadSessionAndMount();
     this.observeChatInput();
     this.subscribeThreadStore();
@@ -776,6 +781,9 @@ class RedmineRocketChatWidget {
         credentials: 'same-origin',
       });
       const config = await res.json();
+      if (config && config.configured === false) {
+        return;
+      }
       this.sessionConfig = config;
 
       const proxyBaseUrl = `/projects/${this.projectId}/rocket_chat/proxy`;

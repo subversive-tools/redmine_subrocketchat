@@ -11,6 +11,12 @@ en:
       open_full_client: "Open in full Rocket.Chat client"
       toggle_sidebar: "Toggle chat sidebar"
       resize_sidebar: "Drag to resize sidebar (double-click to reset)"
+      unconfigured_title: "Rocket.Chat is not configured yet"
+      unconfigured_admin_text: "Please configure the Rocket.Chat server URL and bot connection using the 1-Click Setup Wizard in the plugin settings."
+      unconfigured_user_text: "The Rocket.Chat integration has not been configured yet. Please contact a Redmine administrator."
+      open_plugin_settings: "Open Rocket.Chat Settings"
+      module_unconfigured_short: "not configured"
+      module_settings_link: "Settings"
     autocomplete:
       title: "Link issue or open thread (#)"
       hint: "↑↓ Select · Enter: Insert link · Shift+Enter: Open thread"

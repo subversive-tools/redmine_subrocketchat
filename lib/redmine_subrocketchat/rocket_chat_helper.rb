@@ -20,6 +20,15 @@ module RedmineSubrocketchat
         Setting.plugin_redmine_subrocketchat || {}
       end
 
+      # Public: Checks whether the Rocket.Chat plugin is completely configured (valid Server URL, Bot User ID, and API Token)
+      def configured?
+        s = plugin_settings
+        url = s['rocket_chat_url'].to_s.strip
+        uid = s['rocket_chat_user_id'].to_s.strip
+        tok = s['rocket_chat_token'].to_s.strip
+        url.present? && url != 'https://your-rocketchat-server.com' && uid.present? && tok.present?
+      end
+
       # Public: Returns the Rocket.Chat channel name for a given project
       def channel_name_for(project)
         "rm_#{project.identifier}"
